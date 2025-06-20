@@ -73,4 +73,59 @@ public class CalculatorServiceTest
 	//	// Act & Assert
 	//	Assert.Throws<DivideByZeroException>(() => _calculatorService.Divide(10, 0));
 	//}
+
+    ```csharp
+[Theory]
+[InlineData(5, 3, 8)]
+public void Add_ShouldReturnCorrectSum_PositiveInputs(double a, double b, double expected)
+{
+    // Act
+    var result = _calculatorService.Add(a, b);
+
+    // Assert
+    Assert.Equal(expected, result);
+}
+```
+
+
+    ```csharp
+[Theory]
+[InlineData(5, 3, 2)]
+public void Subtract_ShouldReturnCorrectDifference2(double a, double b, double expected)
+{
+    // Act
+    var result = _calculatorService.Subtract(a, b);
+
+    // Assert
+    Assert.Equal(expected, result);
+}
+```
+
+
+    ```csharp
+[Theory]
+[InlineData(4, 2, 8)]
+public void Multiply_ShouldReturnCorrectProduct_Mutated(double a, double b, double expected)
+{
+    // Act
+    var result = _calculatorService.Multiply(a, b);
+
+    // Assert
+    Assert.Equal(expected, result);
+}
+```
+
+    ```csharp
+[Theory]
+[InlineData(10, 2, 5)]
+public void Divide_ShouldReturnCorrectQuotient(double a, double b, double expected)
+{
+    // Act
+    var result = _calculatorService.Divide(a, b);
+
+    // Assert
+    Assert.Equal(expected, result);
+}
+```
+
 }
