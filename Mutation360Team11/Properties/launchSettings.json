@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Mutation360Team11": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
