@@ -18,12 +18,25 @@ def write_file(file_path: str, content: str):
 
 @tool
 def find_test_file(source_file_path: str) -> str | None:
-    """Finds the corresponding test file for a given C# source file."""
+    """
+    Finds the corresponding test file for a given C# source file.
+    It checks for both [FileName]Tests.cs and [FileName]Test.cs conventions.
+    """
     filename = os.path.basename(source_file_path).replace(".cs", "")
-    test_filename = f"{filename}Tests.cs"
+    
+    # Create a list of possible test filenames
+    possible_test_filenames = [
+        f"{filename}Tests.cs",
+        f"{filename}Test.cs"
+    ]
+
     for root, _, files in os.walk("/repo/"):
-        if test_filename in files:
-            return os.path.relpath(os.path.join(root, test_filename), "/repo")
+        for test_filename in possible_test_filenames:
+            if test_filename in files:
+                # Found a match, return its path
+                return os.path.relpath(os.path.join(root, test_filename), "/repo")
+                
+    # If we searched for all possibilities and found nothing, return None
     return None
 
 class GitTool:
