@@ -2,15 +2,41 @@ import os
 import json
 import subprocess
 import traceback
+import re
+from collections import defaultdict # Import defaultdict
 from jinja2 import Environment, FileSystemLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers.string import StrOutputParser
+# --- NEW IMPORTS ---
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.pydantic_v1 import BaseModel, Field
+# --- END NEW IMPORTS ---
+from langchain_core.output_parsers.string import StrOutputParser # Keep for fallback if needed
 from state import AgentState, SurvivedMutation, GeneratedTest
 from tools import read_file, find_test_file, write_file, GitTool, GitHubApiTool
 
 # --- Initialize Gemini Model ---
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", temperature=0.2)
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", temperature=0.3) # Slightly more creative temp
+
+# --- NEW: Pydantic model for structured LLM output ---
+class GeneratedTestOutput(BaseModel):
+    test_name: str = Field(description="A descriptive, BDD-style (Method_WhenCondition_ShouldResult) name for the test method.")
+    test_code: str = Field(description="The complete C# code for the single xUnit test method, including the [Fact] or [Theory] attribute and using the provided test name.")
+
+# Helper function to clean LLM output (still useful for cleaning code within JSON)
+def _extract_csharp_code_block(raw_string: str) -> str | None:
+    match = re.search(
+        r"(\[(?:Fact|Theory).*?\]\s*public.*?\{.*?\})", 
+        raw_string, 
+        re.DOTALL
+    )
+    if match:
+        return match.group(1).strip()
+    if "public void" in raw_string or "public async Task" in raw_string:
+         return raw_string.strip()
+    return None
+
+# --- mutation_runner_agent and report_analyst_agent remain unchanged ---
 
 def mutation_runner_agent(state: AgentState) -> AgentState:
     print("--- AGENT: Running Mutation Tests ---")
@@ -101,11 +127,16 @@ def report_analyst_agent(state: AgentState) -> AgentState:
     print(f"Analysis complete. Mutation Score: {state['mutation_score']}. Survived: {len(survived)}")
     return state
 
+
+# --- MODIFIED AGENT ---
 def test_generator_agent(state: AgentState) -> AgentState:
     print("--- AGENT: Generating Unit Tests ---")
     if state.get("error_message"): return state
 
     generated_tests: list[GeneratedTest] = []
+    # Track used names per file to prevent duplicates
+    used_names_per_file = defaultdict(set)
+
     for mutation in state["survived_mutations"]:
         target_test_file = find_test_file.invoke(mutation["file_path"])
         
@@ -116,23 +147,26 @@ def test_generator_agent(state: AgentState) -> AgentState:
         try:
             existing_tests = read_file.invoke(target_test_file)
             
+            # 1. SETUP THE STRUCTURED OUTPUT PARSER
+            parser = JsonOutputParser(pydantic_object=GeneratedTestOutput)
+            
             print(f"--- Preparing to generate test for {mutation['file_path']} ---")
             prompt_data = {
                 "file_path": mutation["file_path"],
                 "existing_tests": existing_tests,
                 "original_code": mutation["original_code"],
                 "mutated_code": mutation["mutated_code"],
-                "line": mutation["location"]["start"]["line"]
+                "format_instructions": parser.get_format_instructions(),
             }
-            print(f"Prompt Data: {prompt_data}")
 
-            # Check for empty or None values that could cause an invalid request
-            if not all(prompt_data.values()):
-                print("ERROR: One of the prompt variables is empty. Skipping this mutation.")
-                continue
-
+            # 2. UPDATE THE PROMPT TO REQUEST JSON AND A CREATIVE NAME
             prompt = ChatPromptTemplate.from_messages([
-                ("system", "You are a C# expert specializing in writing concise, effective unit tests using xUnit. Your goal is to write a single new test method to kill a specific mutation. Do NOT provide any explanation, only the raw C# code for the method, including the [Fact] or [Theory] attribute. Ensure the test uses assertions that would fail with the mutated code but pass with the original."),
+                ("system", """You are a C# expert specializing in writing concise, effective unit tests using xUnit.
+Your goal is to write a single new test method to kill a specific mutation.
+You must provide a descriptive, human-readable test name following the BDD convention: Method_When_Should.
+You MUST format your response as a JSON object with the exact keys "test_name" and "test_code".
+Do NOT provide any other text, explanation, or markdown.
+{format_instructions}"""),
                 ("user", """
                 **Source File:** `{file_path}`
                 **Existing Test File Content:**
@@ -141,27 +175,57 @@ def test_generator_agent(state: AgentState) -> AgentState:
                 ```
                 ---
                 **Mutation to Kill**
+                - **Mutator Type:** `{mutator_name}`
                 - **Original Code:** `{original_code}`
                 - **Mutated Code (that survived):** `{mutated_code}`
-                - **Location:** Line {line}
                 ---
-                Please provide one new xUnit test method to kill this mutation.
+                **Instructions:**
+                1. Analyze the difference between the original and mutated code to understand the untested scenario.
+                2. Create a creative and descriptive BDD-style name for a new test that exposes this vulnerability.
+                3. Write the complete C# code for this single xUnit test method.
+                4. Return the name and code in the specified JSON format.
                 """)]
             )
             
-            chain = prompt | llm | StrOutputParser()
-            new_test_code = chain.invoke(prompt_data) # Use the validated data
+            chain = prompt | llm | parser
+            llm_output = chain.invoke(prompt_data)
+
+            # 3. PROCESS AND VALIDATE THE STRUCTURED OUTPUT
+            generated_name = llm_output['test_name']
+            raw_code = llm_output['test_code']
+
+            # Clean the code just in case the LLM includes markdown in the JSON value
+            clean_code = _extract_csharp_code_block(raw_code)
+            
+            if not clean_code:
+                print(f"ERROR: Failed to extract a valid C# method from the LLM output for {mutation['file_path']}. Skipping.")
+                continue
+
+            # 4. ENSURE THE GENERATED NAME IS UNIQUE WITHIN THE FILE
+            final_name = generated_name
+            version = 2
+            while final_name in used_names_per_file[target_test_file]:
+                final_name = f"{generated_name}_v{version}"
+                version += 1
+            
+            used_names_per_file[target_test_file].add(final_name)
+
+            # Replace the placeholder name in the code with our final, unique name
+            # This is a robust way to handle cases where the LLM might hallucinate a different name in the code body.
+            final_code = re.sub(r"public (?:async Task|void) \w+", f"public void {final_name}", clean_code, 1)
 
             generated_tests.append({
                 "target_test_file": target_test_file,
-                "generated_test_code": new_test_code
+                "generated_test_code": final_code
             })
-            print(f"✅ Successfully generated test for mutation in {mutation['file_path']}")
+            print(f"✅ Successfully generated test '{final_name}' for mutation in {mutation['file_path']}")
+
         except Exception as e:
-            print(f"ERROR: Failed to generate test for {mutation['file_path']} due to: {e}")
+            print(f"ERROR: Failed to generate test for {mutation['file_path']} due to: {e}\n{traceback.format_exc()}")
 
     state["generated_tests"] = generated_tests
     return state
+
 
 def code_integration_agent(state: AgentState) -> AgentState:
     print("--- AGENT: Integrating Code and Creating PR ---")
@@ -187,6 +251,7 @@ def code_integration_agent(state: AgentState) -> AgentState:
             content = read_file.invoke(file_path)
             last_brace_index = content.rfind("}")
             if last_brace_index != -1:
+                # Add extra newline for spacing
                 new_content = content[:last_brace_index] + f"\n    {test['generated_test_code']}\n" + content[last_brace_index:]
                 write_file.invoke({
                     "file_path": file_path,
@@ -213,9 +278,8 @@ def code_integration_agent(state: AgentState) -> AgentState:
         Please review and merge this PR into your feature branch (`{state['source_branch']}`) to ensure your changes are robust before merging to `master`.
         """
         
-        # Call the method directly on the instance, not through .invoke()
         pr_url = github_tool.create_pull_request.func(
-            github_tool, # Explicitly pass the instance as 'self'
+            github_tool,
             head_branch=branch_name,
             base_branch=state["source_branch"],
             title=pr_title,
@@ -230,11 +294,11 @@ def code_integration_agent(state: AgentState) -> AgentState:
     
     return state
 
+
 def dashboard_generator_agent(state: AgentState) -> AgentState:
     print("--- AGENT: Generating Dashboard ---")
     env = Environment(loader=FileSystemLoader('/app/templates'))
     
-    # Add the built-in zip function to the template environment
     env.globals['zip'] = zip
     
     template = env.get_template('report_template.html')
