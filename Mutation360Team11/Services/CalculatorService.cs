@@ -1,5 +1,6 @@
 ﻿namespace Mutation360Team11.Services;
 
+
 public class CalculatorService
 {
 	// Method for addition
