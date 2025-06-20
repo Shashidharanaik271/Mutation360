@@ -1,0 +1,16 @@
+/stryker-agent/
+├── .github/
+│   └── workflows/
+│       └── main.yml           # GitHub Actions workflow
+├── app/
+│   ├── __init__.py
+│   ├── main.py                # Main entrypoint for the application
+│   ├── state.py               # LangGraph state definition
+│   ├── graph.py               # LangGraph graph definition
+│   ├── agents.py              # Agent logic implementations
+│   ├── tools.py               # Custom tools for agents (Git, File I/O)
+│   └── templates/
+│       └── report_template.html # Jinja2 template for the final report
+├── Dockerfile
+├── requirements.txt
+└── stryker-config.json        # Example Stryker config for the C# project. Place this in the root of your C# repository. Adjust paths as needed.

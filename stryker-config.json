@@ -1,0 +1,14 @@
+{
+  "stryker-config": {
+    "solution": "Mutation360Team11.sln",
+    "reporters": [
+      "progress",
+      "html",
+      "json"
+    ],
+    "thresholds": {
+      "break": 0
+    },
+    "report-file-name": "stryker-report"
+  }
+}

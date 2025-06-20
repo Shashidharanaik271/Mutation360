@@ -1,0 +1,42 @@
+name: AI Mutation Testing Agent
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  run-ai-agent:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Checkout Feature Branch Code
+        uses: actions/checkout@v4
+        with:
+          # Fetch all history for all branches so we can checkout correctly
+          fetch-depth: 0
+
+      - name: Ensure we are on the correct branch
+        run: git checkout ${{ github.head_ref }}
+
+      - name: Build and Run AI Agent Docker Container
+        run: |
+          docker build --no-cache -t stryker-agent -f ./stryker-agent/Dockerfile ./stryker-agent
+          
+          docker run --rm \
+            -v "$(pwd)":/repo \
+            -e GITHUB_TOKEN="${{ secrets.GH_PAT }}" \
+            -e GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
+            -e GITHUB_REPOSITORY="${{ github.repository }}" \
+            -e PR_NUMBER="${{ github.event.number }}" \
+            -e SOURCE_BRANCH="${{ github.head_ref }}" \
+            stryker-agent
+
+      - name: Upload Mutation Report as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-test-dashboard
+          path: mutation-dashboard.html
