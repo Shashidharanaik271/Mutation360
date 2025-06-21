@@ -7,10 +7,14 @@ class UnfixedMutation(TypedDict):
     line: int
     original_code: str
     mutated_code: str
+    # NEW: For the workbench risk assessment
+    risk_level: str # 'HIGH', 'MEDIUM', 'LOW'
+    risk_icon: str # '🔥', '⚠️', '⚪'
 
 class GeneratedTest(TypedDict):
     target_test_file: str
     generated_test_code: str
+    # NEW: For the "Test Case Story"
     explanation: str
 
 class MutationStats(TypedDict):
@@ -19,6 +23,13 @@ class MutationStats(TypedDict):
     survived: int
     no_coverage: int
     compile_error: int
+
+# NEW: For the performance stats widget
+class RunStats(TypedDict):
+    analysis_time_seconds: int
+    mutants_generated: int
+    survivors_found: int
+    tests_generated: int
 
 class AgentState(TypedDict):
     # Inputs
@@ -30,7 +41,7 @@ class AgentState(TypedDict):
     # Core State
     stryker_report_path: Optional[str]
     mutation_score: float
-    survived_mutations: List[Dict] # Using Dict for flexibility with 'ai_reason'
+    survived_mutations: List[Dict]
     generated_tests: List[GeneratedTest]
     new_branch_name: Optional[str]
     new_pr_url: Optional[str]
@@ -40,11 +51,14 @@ class AgentState(TypedDict):
     mutation_stats: Optional[MutationStats]
     survived_by_mutator: Optional[Dict[str, int]]
     
-    # For "Projected Impact"
+    # NEW: For the "File Hotspots" chart
+    survived_by_file: Optional[Dict[str, int]]
+    
+    # NEW: For the "Projected Impact" scorecard
     projected_score: Optional[float]
     
-    # For "Mission Log"
-    mission_log: List[str]
+    # NEW: For the top performance widget
+    run_stats: Optional[RunStats]
     
-    # For "Mutation Workbench"
+    # NEW: For the "Mutation Workbench"
     unfixed_mutants: List[UnfixedMutation]
