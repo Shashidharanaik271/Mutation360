@@ -73,4 +73,58 @@ public class CalculatorServiceTest
 	//	// Act & Assert
 	//	Assert.Throws<DivideByZeroException>(() => _calculatorService.Divide(10, 0));
 	//}
+
+    [Theory]
+        [InlineData(3, 5, 8)]
+        [InlineData(-4, 6, 2)]
+        public void Add_ArithmeticMutationWithNonZeroOperands_ReturnsCorrectSum(double a, double b, double expected)
+        {
+            // Act
+            var result = _calculatorService.Add(a, b);
+
+            // Assert
+            Assert.Equal(expected, result);
+        }
+
+    [Fact]
+            public void Subtract_ArithmeticMutation_ReturnsCorrectDifference()
+            {
+                // Arrange
+                double a = 10;
+                double b = 4;
+                double expected = 6;
+
+                // Act
+                var result = _calculatorService.Subtract(a, b);
+
+                // Assert
+                // The mutation a + b would result in 14, failing this assertion.
+                Assert.Equal(expected, result);
+            }
+
+    [Theory]
+    	[InlineData(3, 5, 15)]
+    	public void Multiply_ArithmeticMutation_ReturnsProductNotQuotient(double a, double b, double expected)
+    	{
+    		// Act
+    		var result = _calculatorService.Multiply(a, b);
+
+    		// Assert
+    		Assert.Equal(expected, result);
+    	}
+
+    [Fact]
+        public void Divide_ArithmeticMutation_ReturnsCorrectQuotient()
+        {
+            // Arrange
+            double a = 10;
+            double b = 2;
+            double expected = 5; // The mutation a * b would result in 20
+
+            // Act
+            var result = _calculatorService.Divide(a, b);
+
+            // Assert
+            Assert.Equal(expected, result);
+        }
 }
