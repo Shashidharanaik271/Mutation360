@@ -4,6 +4,7 @@ import re # Import the regular expression module
 import textwrap 
 import subprocess
 import traceback
+from collections import Counter # Add this import at the top of agents.py
 from jinja2 import Environment, FileSystemLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -92,7 +93,24 @@ def report_analyst_agent(state: AgentState) -> AgentState:
     report_content = json.loads(read_file.invoke(state["stryker_report_path"]))
     state["mutation_score"] = report_content.get("mutationScore", 0.0)
     
+    # --- NEW: Detailed stat collection ---
+    all_mutants = []
+    for file_report in report_content.get("files", {}).values():
+        all_mutants.extend(file_report.get("mutants", []))
+
+    status_counts = Counter(m["status"] for m in all_mutants)
+    
+    state["mutation_stats"] = {
+        "total_mutants": len(all_mutants),
+        "killed": status_counts.get("Killed", 0),
+        "survived": status_counts.get("Survived", 0),
+        "no_coverage": status_counts.get("NoCoverage", 0),
+        "compile_error": status_counts.get("CompileError", 0)
+    }
+    # --- END NEW ---
+
     survived: list[SurvivedMutation] = []
+    survived_mutator_names = []
     for file_path, file_report in report_content.get("files", {}).items():
         relative_path = os.path.relpath(file_path, "/repo")
         source_context = read_file.invoke(relative_path)
@@ -102,21 +120,25 @@ def report_analyst_agent(state: AgentState) -> AgentState:
             if mutant["status"] == "Survived":
                 start_line = mutant["location"]["start"]["line"]
                 end_line = mutant["location"]["end"]["line"]
-                # Adjust for 0-based list indexing and slice to get the relevant lines
                 original_code_lines = source_lines[start_line - 1 : end_line]
                 original_code = "\n".join(original_code_lines)
 
                 survived.append({
                     "file_path": relative_path,
                     "mutator_name": mutant["mutatorName"],
-                    "original_code": original_code,  # Use the correctly extracted code
-                    "mutated_code": mutant["replacement"], # This key is correct
+                    "original_code": original_code,
+                    "mutated_code": mutant["replacement"],
                     "location": mutant["location"],
                     "source_code_context": source_context
                 })
+                survived_mutator_names.append(mutant["mutatorName"])
 
     state["survived_mutations"] = survived
+    # --- NEW: Count survived mutants by type ---
+    state["survived_by_mutator"] = Counter(survived_mutator_names)
+    
     print(f"Analysis complete. Mutation Score: {state['mutation_score']}. Survived: {len(survived)}")
+    print(f"Detailed Stats: {state['mutation_stats']}")
     return state
 
 def test_generator_agent(state: AgentState) -> AgentState:
