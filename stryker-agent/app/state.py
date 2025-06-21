@@ -11,6 +11,7 @@ class SurvivedMutation(TypedDict):
 class GeneratedTest(TypedDict):
     target_test_file: str
     generated_test_code: str
+    explanation: str
 
 # NEW: For detailed stats
 class MutationStats(TypedDict):
