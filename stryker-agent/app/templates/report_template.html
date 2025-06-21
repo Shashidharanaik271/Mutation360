@@ -12,147 +12,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
 
     <!-- 2. Design System (CSS) -->
- for clarity.
-
-I will implement this by:
-
-1.  **Semantic Coloring for the Doughnut Chart:** The "Overall Mutation Status" chart has specific categories. I will assign colors logically:
-    *   **Killed:** Green (Success)
-    *   **Survived:** Red (Failure/Danger)
-    *   **No Coverage:** Yellow (Warning - a good compromise)
-    *   **Compile Error:** Blue (Informational)
-2.  **Repeating Palette for Bar Charts:** For the "Top Survived Mutators" and "File Hotspots" bar charts, I will create a repeating palette of `[Red, Green, Blue]` so the colors will cycle for each bar.
-
-This change only affects the `report_template.html` file.
-
-### **`report_template.html` (Corrected)**
-
-Here is the complete, updated file. The only changes are in the `<script>` block at the bottom.
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>AI Mutation Testing Report</title>
-    
-    <!-- 1. Dependencies -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
-    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
-
-    <!-- 2. Design System (CSS) -->
     <style>
-        :root {
-            --color-bg: #f8f9fa;
-            --color-surface: #ffffff;
-            --color-border: #e9ecef;
-            --color-text-primary: #212529;
-            --color-text-secondary: #6c757d;
-            --color-primary: #4c6ef5;
-            --color-success: #20c997;
-            --color-danger: #fa5252;
-            --color-warning: #fab005;
-            --font-family: 'Inter', sans-serif;
-            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-        }
-        body {
-            font-family: var(--font-family);
-            margin: 0;
-            background-color: var(--color-bg);
-            color: var(--color-text-primary);
-        }
-        .container { max-width: 1280px; margin: 0 auto; padding: 2rem; }
-        h1, h2, h3, h4 { font-weight: 700; color: var(--color-text-primary); }
-        h1 { font-size: 2rem; }
-        h2 { font-size: 1.5rem; margin-top: 3rem; margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); }
-        .card { background-color: var(--color-surface); border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; box-shadow: var(--shadow); border: 1px solid var(--color-border); }
-        
-        /* Header */
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
-        .header-meta { color: var(--color-text-secondary); font-size: 0.9rem; }
-        
-        /* Impact Card */
-        .impact-card .projection-bars { margin-top: 1.5rem; }
-        .projection-bars .bar-label { font-weight: 500; width: 100px; color: var(--color-text-secondary); }
-        .projection-bars .bar-container { flex-grow: 1; background-color: #e9ecef; border-radius: 8px; height: 24px; }
-        .projection-bars .bar { height: 100%; border-radius: 8px; transition: width 0.5s ease-out; }
-        .projection-bars .current-bar { background-color: var(--color-warning); }
-        .projection-bars .projected-bar { background: linear-gradient(90deg, var(--color-warning) 0%, var(--color-success) 100%); }
-        .projection-bars .value { font-weight: 600; margin-left: 1rem; }
-        .pr-button { display: inline-block; background-color: var(--color-primary); color: white; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 1.5rem; transition: background-color 0.2s; }
-        .pr-button:hover { background-color: #364fc7; }
-
-        /* Stats & Charts */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.5rem; }
-        .stat-card { text-align: center; padding: 1rem; background-color: #f8f9fa; border-radius: 8px; }
-        .stat-card .value { font-size: 2rem; font-weight: 700; }
-        .stat-card .label { font-size: 0.9rem; color: var(--color-text-secondary); }
-        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; align-items: start; }
-        .chart-container { height: 350px; }
-
-        /* Test Case Story */
-        .story-card .ai-analysis { background-color: #f3f5ff; border-left: 4px solid var(--color-primary); padding: 1rem 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
-        .story-card .ai-analysis ion-icon { color: var(--color-primary); font-size: 1.2rem; vertical-align: middle; margin-right: 0.5rem; }
-        .code-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-        .code-block-header { background-color: #3a3f4b; color: #ccc; padding: 0.75rem 1.25rem; border-top-left-radius: 8px; border-top-right-radius: 8px; font-family: monospace; font-size: 0.9rem; }
-        pre[class*="language-"] { margin: 0; border-top-left-radius: 0; border-top-right-radius: 0; border: none; }
-
-        /* Workbench Table */
-        .workbench-table { width: 100%; border-collapse: collapse; }
-        .workbench-table th, .workbench-table td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--color-border); }
-        .workbench-table th { font-weight: 600; color: var(--color-text-secondary); font-size: 0.85rem; text-transform: uppercase; }
-        .workbench-table td { font-size: 0.95rem; }
-        .risk-badge { padding: 0.25rem 0.75rem; border-radius: 1rem; font-weight: 600; font-size: 0.8rem; }
-        .risk-high { background-color: #fff5f5; color: var(--color-danger); }
-        .risk-medium { background-color: #fff9db; color: #e8590c; }
-        .risk-low { background-color: #f8f9fa; color: var(--color-text-secondary); }
-        .summon-button { background: none; border: 1px solid var(--color-primary); color: var(--color-primary); padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .summon-button:hover { background-color: #f3f5ff; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header class="header">
-            <h1>AI Analyst Report</h1>
-            <div class="header-meta">
-                For PR #{{ state.pr_number }} into <code>{{ state.source_branch }}</code>
-            </div>
-        </header>
-
-        <main>
-            {% if not state.error_message %}
-            <!-- 1. Agent Impact Projection -->
-            <div class="card impact-card">
-                <h3 style="margin:0;">Agent Impact Projection</h3>
-                <p style="margin-top:0.25rem; color: var(--color-text-secondary);">The agent's PR will directly improve your code's test quality.</p>
-                <div class="projection-bars">
-                    <div style="display: flex; align-items: center; margin-bottom: 0.75rem;">
-                        <div class="bar-label">Current</div>
-                        <div class="bar-container"><div class="bar current-bar" style="width: {{ state.mutation_score }}%;"></div></div>
-                        <div class="value">{{ "%.1f"|format(state.mutation_score) }}%</div>
-                    </div>
-                    <div style="display: flex; align-items: center;">
-                        <div class="bar-label">After Merge</div>
-                        <div class="bar-container"><div class="bar projected-bar" style="width: {{ state.projected_score }}%;"></div></div>
-                        <div class="value">{{ "%.1f"|format(state.projected_score) }}%</div>
-                    </div>
-                </div>
-                {% if state.new_pr_url %}
-                <a href="{{ state.new_pr_url }}" target="_blank" class="pr-button">
-                    <ion-icon name="git-pull-request-outline" style="vertical-align: middle; margin-right: 0.5rem;"></ion-icon>
-                    View Corrective Pull Request
-                </a>
-                {% endif %}
-            </div>
-
-            <!-- 2. Data Deep Dive -->
-            <h2>Data Deep Dive: Visual Analytics</h2>
-            <div class="card">
-                <div class="stats-grid">
-                    <div class="    <style>
         :root {
             --color-bg: #f8f9fa;
             --color-surface: #ffffff;
@@ -162,7 +22,7 @@ Here is the complete, updated file. The only changes are in the `<script>` block
             --color-primary: #4c6ef5; /* Blue */
             --color-success: #20c997; /* Green */
             --color-danger: #fa5252;  /* Red */
-            --color-warning: #fab005;
+            --color-warning: #fab005; /* Yellow */
             --font-family: 'Inter', sans-serif;
             --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
         }
@@ -261,54 +121,6 @@ Here is the complete, updated file. The only changes are in the `<script>` block
             <div class="card">
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="value">{{ state.run_stats.analysis_time_seconds }}s</div>
-                        <div class="label">Analysis Time</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="value">{{ state.run_stats.mutants_generated }}</div>
-                        <div class="label">Mutants Generated</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="value" style="color: var(--color-danger);">{{ state.run_stats.survivors_found }}</div>
-                        <div class="label">Survivors Found</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="value" style="color: var(--color-success);">{{ state.run_stats.tests_generated }}</div>
-                        <div class="label">Tests Added</div>
-                    </div>
-                </div>
-                <hr style="border: 0; height: 1px; background-color: var(--color-border); margin: 2rem 0;">
-                <div class="charts-grid">
-                    <div class="chart-container"><canvas id="statusChart"></canvas></div>
-                    <div class="chart-container"><canvas id="mutatorChart"></canvas></div>
-                    <div class="chart-container"><canvas id="fileHotspotsChart"></canvas></div>
-                </div>
-            </div>
-
-            <!-- 3. Test Case Stories -->
-            {% if state.generated_tests %}
-            <h2>Test Case Stories: How the Agent Fixed Your Code</h2>
-            {% for mutation, test in zip(state.survived_mutations, state.generated_tests) %}
-            <div class="card story-card">
-                <h3 style="margin: 0;">Fix for <code>{{ mutation.file_path }}</code></h3>
-                <p style="margin: 0.25rem 0 1.5rem; color: var(--color-text-secondary);">Line {{ mutation.location.start.line }} • Mutator: {{ mutation.mutator_name }}</p>
-                
-                <div class="ai-analysis">
-                    <ion-icon name="bulb-outline"></ion-icon>
-                    <strong>AI Analysis:</strong> {{ test.explanation }}
-                </div>
-
-                <div class="code-grid">
-                    <div>
-                        <div class="code-block-header">Original Code</div>
-                        <pre><code class="language-csharp">{{ mutation.original_code }}</code></pre>
-                    </div>
-                    <div>
-                        <div class="code-block-header">Survived Mutant</div>
-                        <pre><code class="language-csharp">{{ mutation.mutated_code }}</code></pre>
-                    </div>
-                </div>
-                <hr style="border: 0; height: 1px;stat-card">
                         <div class="value">{{ state.run_stats.analysis_time_seconds }}s</div>
                         <div class="label">Analysis Time</div>
                     </div>
@@ -410,14 +222,12 @@ Here is the complete, updated file. The only changes are in the `<script>` block
         document.addEventListener('DOMContentLoaded', () => {
             const stateData = {{ state | tojson }};
             if (!stateData.error_message) {
-                // --- NEW: Define the user-requested Red, Green, Blue palette for bar charts ---
                 const barChartPalette = [
                     'var(--color-danger)',  // Red
                     'var(--color-success)', // Green
                     'var(--color-primary)'  // Blue
                 ];
 
-                // --- NEW: Define the semantic palette for the doughnut chart ---
                 const statusChartPalette = [
                     'var(--color-success)', // Green for Killed
                     'var(--color-danger)',  // Red for Survived
@@ -433,7 +243,7 @@ Here is the complete, updated file. The only changes are in the `<script>` block
                     }
                 });
 
-                // Chart 1: Mutation Status (Doughnut chart) - THIS IS THE CORRECTED SECTION
+                // Chart 1: Mutation Status (Doughnut chart)
                 const statusCtx = document.getElementById('statusChart').getContext('2d');
                 new Chart(statusCtx, {
                     type: 'doughnut',
@@ -441,7 +251,7 @@ Here is the complete, updated file. The only changes are in the `<script>` block
                         labels: ['Killed', 'Survived', 'No Coverage', 'Compile Error'],
                         datasets: [{
                             data: [stateData.mutation_stats.killed, stateData.mutation_stats.survived, stateData.mutation_stats.no_coverage, stateData.mutation_stats.compile_error],
-                            backgroundColor: statusChartPalette, // Use the new semantic palette
+                            backgroundColor: statusChartPalette,
                             borderColor: 'var(--color-surface)', borderWidth: 4, hoverOffset: 8
                         }]
                     },
@@ -457,7 +267,7 @@ Here is the complete, updated file. The only changes are in the `<script>` block
                             labels: Object.keys(stateData.survived_by_mutator),
                             datasets: [{ 
                                 data: Object.values(stateData.survived_by_mutator), 
-                                backgroundColor: barChartPalette, // Use the new R,G,B palette
+                                backgroundColor: barChartPalette,
                                 borderRadius: 4 
                             }]
                         },
@@ -474,7 +284,7 @@ Here is the complete, updated file. The only changes are in the `<script>` block
                             labels: Object.keys(stateData.survived_by_file),
                             datasets: [{ 
                                 data: Object.values(stateData.survived_by_file), 
-                                backgroundColor: barChartPalette, // Use the new R,G,B palette
+                                backgroundColor: barChartPalette,
                                 borderRadius: 4 
                             }]
                         },
