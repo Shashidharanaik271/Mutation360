@@ -222,7 +222,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             const stateData = {{ state | tojson }};
             if (!stateData.error_message) {
-                // --- NEW: Define a vibrant color palette for bar charts ---
                 const colorPalette = [
                     '#4C6EF5', '#228BE6', '#15AABF', '#12B886',
                     '#40C057', '#82C91E', '#FAB005', '#FD7E14'
@@ -236,7 +235,7 @@
                     }
                 });
 
-                // Chart 1: Mutation Status (Doughnut chart)
+                // Chart 1: Mutation Status (Doughnut chart) - THIS IS THE CORRECTED SECTION
                 const statusCtx = document.getElementById('statusChart').getContext('2d');
                 new Chart(statusCtx, {
                     type: 'doughnut',
@@ -244,7 +243,8 @@
                         labels: ['Killed', 'Survived', 'No Coverage', 'Compile Error'],
                         datasets: [{
                             data: [stateData.mutation_stats.killed, stateData.mutation_stats.survived, stateData.mutation_stats.no_coverage, stateData.mutation_stats.compile_error],
-                            backgroundColor: ['var(--color-success)', 'var(--color-danger)', 'var(--color-warning)', '#868e96'],
+                            // --- THE FIX IS HERE ---
+                            backgroundColor: colorPalette, // Use the vibrant palette instead of the old hardcoded colors
                             borderColor: 'var(--color-surface)', borderWidth: 4, hoverOffset: 8
                         }]
                     },
@@ -268,7 +268,7 @@
                     });
                 }
 
-                // Chart 3: File Hotspots (Bar chart) - THIS IS THE CORRECTED SECTION
+                // Chart 3: File Hotspots (Bar chart)
                 if (stateData.survived_by_file && Object.keys(stateData.survived_by_file).length > 0) {
                     const fileCtx = document.getElementById('fileHotspotsChart').getContext('2d');
                     new Chart(fileCtx, {
@@ -277,7 +277,7 @@
                             labels: Object.keys(stateData.survived_by_file),
                             datasets: [{ 
                                 data: Object.values(stateData.survived_by_file), 
-                                backgroundColor: colorPalette, // Also apply the palette here
+                                backgroundColor: colorPalette,
                                 borderRadius: 4 
                             }]
                         },
