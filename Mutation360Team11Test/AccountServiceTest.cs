@@ -235,4 +235,167 @@ public class AccountServiceTest
 		// Assert
 		Assert.Equal(string.Empty, result);
 	}
+
+    [Fact]
+    public void Constructor_ShouldAssignExternalService()
+    {
+        // Arrange
+        var mockExternalService = new Mock<IExternalService>();
+
+        // Act
+        var accountService = new AccountService(mockExternalService.Object);
+
+        // Assert - Indirectly assert by verifying a call to the external service in a subsequent method call.
+        accountService.GetApplicationName(1);
+        mockExternalService.Verify(es => es.GetApplicationName(), Times.Once);
+    }
+
+    [Fact]
+    public void GetAllAccountDescription_ShouldReturnNullDescriptions_WhenCanProcessAccountDescriptionIsFalse()
+    {
+        // Arrange
+        var accounts = new List<Account>
+        {
+            new Account { Id = 1, AccountName = "Account1", AccountDescription = "Description1", AccountType = AccountType.SystemAdmin },
+            new Account { Id = 2, AccountName = "Account2", AccountDescription = "Description2", AccountType = AccountType.BusinessAdmin }
+        };
+
+        // Act
+        var result = _accountService.GetAllAccountDescription(accounts, false);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.Equal("Account1", result[0].AccountName);
+        Assert.Null(result[0].AccountDescription);
+        Assert.Equal("Account2", result[1].AccountName);
+        Assert.Null(result[1].AccountDescription);
+    }
+
+    [Fact]
+    public void GetAllAccountTypeAndDescription_ShouldReturnCorrectDetails_WithPopulatedDTO()
+    {
+        // Arrange
+        var accounts = new List<Account>
+        {
+            new Account
+            {
+                Id = 1,
+                AccountName = "Account1",
+                AccountDescription = "Description1",
+                AccountType = AccountType.SystemAdmin,
+                AccountKey = null!
+            },
+            new Account
+            {
+                Id = 2,
+                AccountName = "Account2",
+                AccountDescription = "Description2",
+                AccountType = AccountType.BusinessAdmin,
+                AccountKey = "2:Account2Key"
+            }
+        };
+
+        // Act
+        var result = _accountService.GetAllAccountTypeAndDescription(accounts);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count);
+
+        Assert.Equal("Description1", result[0].AccountDescription);
+        Assert.Equal(AccountType.SystemAdmin, result[0].AccountType);
+
+        Assert.Equal("Description2", result[1].AccountDescription);
+        Assert.Equal(AccountType.BusinessAdmin, result[1].AccountType);
+    }
+
+    [Fact]
+    public void GetAccountKeySecondElement_NullAccountKey_ReturnsNull()
+    {
+        // Arrange
+        string accountKey = null;
+
+        // Act
+        var result = _accountService.GetAccountKeySecondElement(accountKey);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void GetAccountKeySecondElement_AccountKeyWithOnePart_ReturnsNull()
+    {
+        // Arrange
+        string accountKey = "singlePart";
+
+        // Act
+        var result = _accountService.GetAccountKeySecondElement(accountKey);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Theory]
+    [InlineData("TestName", "TestDescription", "")]
+    public void GetAccountIdByOtherInformationAsString_NameAndDescriptionNotNullOrWhiteSpaceKeyIsWhiteSpace_ThrowsException(string name, string description, string key)
+    {
+        // Act & Assert
+        Assert.Throws<Exception>(() => _accountService.GetAccountIdByOtherInformationAsString(name, description, key));
+    }
+
+    [Theory]
+    [InlineData(null, "TestDescription", "TestKey")]
+    [InlineData("", "TestDescription", "TestKey")]
+    [InlineData(" ", "TestDescription", "TestKey")]
+    public void GetAccountIdByOtherInformationAsString_NameIsNullOrEmpty_ThrowsException(string name, string description, string key)
+    {
+        // Act & Assert
+        Assert.Throws<Exception>(() => _accountService.GetAccountIdByOtherInformationAsString(name, description, key));
+    }
+
+    [Fact]
+    public void GetAllAccount_ShouldReturnEmptyList_WhenAccountsAreNull()
+    {
+        // Arrange
+        List<Account> accounts = null;
+
+        // Act
+        var result = _accountService.GetAllAccount(accounts);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void GetAllAccount_ShouldReturnSameList_WhenAccountsIsNotNull()
+    {
+        // Arrange
+        var accounts = new List<Account>
+        {
+            new Account { Id = 1, AccountName = "Account1", AccountDescription = "Description1", AccountType = AccountType.SystemAdmin, AccountKey = "Key1" },
+            new Account { Id = 2, AccountName = "Account2", AccountDescription = "Description2", AccountType = AccountType.BusinessAdmin, AccountKey = "Key2" }
+        };
+
+        // Act
+        var result = _accountService.GetAllAccount(accounts);
+
+        // Assert
+        Assert.Same(accounts, result);
+    }
+
+    [Fact]
+    public void GetApplicationName_ApplicationIdEqualsOne_ReturnsEmptyString()
+    {
+        // Arrange
+        var mockExternalService = new Mock<IExternalService>();
+        var accountService = new AccountService(mockExternalService.Object);
+        int applicationId = 1;
+
+        // Act
+        var result = accountService.GetApplicationName(applicationId);
+
+        // Assert
+        Assert.Equal(string.Empty, result);
+    }
 }

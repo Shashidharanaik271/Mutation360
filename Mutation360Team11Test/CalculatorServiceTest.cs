@@ -73,4 +73,64 @@ public class CalculatorServiceTest
 	//	// Act & Assert
 	//	Assert.Throws<DivideByZeroException>(() => _calculatorService.Divide(10, 0));
 	//}
+
+    [Fact]
+    public void Add_TwoPositiveNumbers_ReturnsCorrectSum()
+    {
+        // Arrange
+        double a = 5;
+        double b = 3;
+        double expected = 8;
+
+        // Act
+        var result = _calculatorService.Add(a, b);
+
+        // Assert
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void Subtract_ShouldSubtractPositiveNumbers()
+    {
+        // Arrange
+        var calculatorService = new CalculatorService();
+        double a = 10;
+        double b = 5;
+
+        // Act
+        var result = calculatorService.Subtract(a, b);
+
+        // Assert
+        Assert.Equal(5, result);
+    }
+
+    [Fact]
+    public void Multiply_ShouldReturnCorrectProduct_WithNonZeroOperands()
+    {
+        // Arrange
+        var a = 2.0;
+        var b = 3.0;
+        var expected = 6.0;
+
+        // Act
+        var result = _calculatorService.Multiply(a, b);
+
+        // Assert
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void Divide_ShouldReturnCorrectQuotient_WithNonZeroOperands()
+    {
+        // Arrange
+        double a = 10;
+        double b = 2;
+        double expected = 5;
+
+        // Act
+        var result = _calculatorService.Divide(a, b);
+
+        // Assert
+        Assert.Equal(expected, result);
+    }
 }
