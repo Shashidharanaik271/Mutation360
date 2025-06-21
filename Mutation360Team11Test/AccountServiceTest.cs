@@ -235,4 +235,159 @@ public class AccountServiceTest
 		// Assert
 		Assert.Equal(string.Empty, result);
 	}
+
+    [Fact]
+            public void GetApplicationName_ConstructorBlockRemoved_ThrowsNullReferenceOnValidId()
+            {
+                // Arrange
+                _mockExternalServiceMock.Setup(s => s.GetApplicationName()).Returns("SomeAppName");
+                var validApplicationId = 1;
+
+                // Act
+                var result = _accountService.GetApplicationName(validApplicationId);
+
+                // Assert
+                // This assertion will pass with the original code, but the method call will
+                // throw a NullReferenceException with the mutated code, killing the mutant.
+                Assert.Equal("SomeAppName", result);
+            }
+
+    [Fact]
+    public void GetAllAccountDescription_WhenConditionalIsTrueMutationAndCanProcessIsFalse_ReturnsNullDescription()
+    {
+        // Arrange
+        var accounts = new List<Account>
+        {
+            new Account { Id = 1, AccountName = "Account1", AccountDescription = "Description1", AccountType = AccountType.SystemAdmin }
+        };
+
+        // Act
+        var result = _accountService.GetAllAccountDescription(accounts, false);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        Assert.Null(result[0].AccountDescription);
+    }
+
+    [Fact]
+    public void GetAllAccountTypeAndDescription_ObjectInitializerMutation_ReturnsCorrectlyMappedDetails()
+    {
+        // Arrange
+        var accounts = new List<Account>
+        {
+            new Account
+            {
+                Id = 1,
+                AccountName = "Test Account",
+                AccountDescription = "Specific Description",
+                AccountType = AccountType.BusinessAdmin // A non-default enum value
+            }
+        };
+
+        // Act
+        var result = _accountService.GetAllAccountTypeAndDescription(accounts);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        var details = result.First();
+        Assert.Equal("Specific Description", details.AccountDescription);
+        Assert.Equal(AccountType.BusinessAdmin, details.AccountType);
+    }
+
+    [Fact]
+    public void GetAccountKeySecondElement_WhenAccountKeyIsNull_ReturnsNull()
+    {
+        // Arrange
+        string accountKey = null;
+
+        // Act
+        var result = _accountService.GetAccountKeySecondElement(accountKey);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    	public void GetAccountKeySecondElement_LinqFirstToFirstOrDefault_ThrowsExceptionWhenKeyHasNoDelimiter()
+    	{
+    		// Arrange
+    		var accountKey = "singlepart";
+
+    		// Act & Assert
+    		Assert.Throws<InvalidOperationException>(() => _accountService.GetAccountKeySecondElement(accountKey));
+    	}
+
+    [Fact]
+    public void GetAccountIdByOtherInformationAsString_LogicalMutation_ThrowsExceptionWhenOnlyDescriptionIsInvalid()
+    {
+        // Arrange
+        var name = "ValidName";
+        var description = ""; // Invalid
+        var key = "ValidKey";
+
+        // Act & Assert
+        Assert.Throws<Exception>(() => _accountService.GetAccountIdByOtherInformationAsString(name, description, key));
+    }
+
+    [Fact]
+            public void GetAccountIdByOtherInformationAsString_LogicalMutation_ThrowsExceptionWhenOnlyOneArgumentIsInvalid()
+            {
+                // Arrange
+                var name = "ValidName";
+                var description = "ValidDescription";
+                var key = ""; // Invalid key
+
+                // Act & Assert
+                Assert.Throws<Exception>(() => _accountService.GetAccountIdByOtherInformationAsString(name, description, key));
+            }
+
+    [Fact]
+            public void GetAllAccount_NullCoalescingMutation_ReturnsSameListWhenNotNull()
+            {
+                // Arrange
+                var accounts = new List<Account>
+                {
+                    new Account { Id = 1, AccountName = "Account1" }
+                };
+
+                // Act
+                var result = _accountService.GetAllAccount(accounts);
+
+                // Assert
+                Assert.Same(accounts, result);
+            }
+
+    [Fact]
+        public void GetAllAccount_NullCoalescingRemoveLeft_ReturnsInputListWhenNotNull()
+        {
+            // Arrange
+            var accounts = new List<Account>
+            {
+                new Account { Id = 1, AccountName = "Test Account" }
+            };
+
+            // Act
+            var result = _accountService.GetAllAccount(accounts);
+
+            // Assert
+            Assert.Same(accounts, result);
+        }
+
+    [Fact]
+    public void GetApplicationName_EqualityMutation_ReturnsApplicationNameWhenIdIsOne()
+    {
+        // Arrange
+        var expectedAppName = "TestApplication";
+        _mockExternalServiceMock.Setup(es => es.GetApplicationName()).Returns(expectedAppName);
+        var accountService = new AccountService(_mockExternalServiceMock.Object);
+        int applicationId = 1;
+
+        // Act
+        var result = accountService.GetApplicationName(applicationId);
+
+        // Assert
+        Assert.Equal(expectedAppName, result);
+    }
 }
