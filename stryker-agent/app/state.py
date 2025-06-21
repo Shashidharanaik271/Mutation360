@@ -1,5 +1,14 @@
 from typing import TypedDict, List, Optional, Dict
 
+# NEW: Added the missing SurvivedMutation definition
+class SurvivedMutation(TypedDict):
+    file_path: str
+    mutator_name: str
+    original_code: str
+    mutated_code: str
+    location: Dict
+    source_code_context: str
+
 class UnfixedMutation(TypedDict):
     file_path: str
     mutator_name: str
@@ -7,14 +16,14 @@ class UnfixedMutation(TypedDict):
     line: int
     original_code: str
     mutated_code: str
-    # NEW: For the workbench risk assessment
+    # For the workbench risk assessment
     risk_level: str # 'HIGH', 'MEDIUM', 'LOW'
     risk_icon: str # '🔥', '⚠️', '⚪'
 
 class GeneratedTest(TypedDict):
     target_test_file: str
     generated_test_code: str
-    # NEW: For the "Test Case Story"
+    # For the "Test Case Story"
     explanation: str
 
 class MutationStats(TypedDict):
@@ -24,7 +33,7 @@ class MutationStats(TypedDict):
     no_coverage: int
     compile_error: int
 
-# NEW: For the performance stats widget
+# For the performance stats widget
 class RunStats(TypedDict):
     analysis_time_seconds: int
     mutants_generated: int
@@ -41,7 +50,8 @@ class AgentState(TypedDict):
     # Core State
     stryker_report_path: Optional[str]
     mutation_score: float
-    survived_mutations: List[Dict]
+    # UPDATED: Changed from List[Dict] to the new, specific type
+    survived_mutations: List[SurvivedMutation] 
     generated_tests: List[GeneratedTest]
     new_branch_name: Optional[str]
     new_pr_url: Optional[str]
@@ -51,14 +61,14 @@ class AgentState(TypedDict):
     mutation_stats: Optional[MutationStats]
     survived_by_mutator: Optional[Dict[str, int]]
     
-    # NEW: For the "File Hotspots" chart
+    # For the "File Hotspots" chart
     survived_by_file: Optional[Dict[str, int]]
     
-    # NEW: For the "Projected Impact" scorecard
+    # For the "Projected Impact" scorecard
     projected_score: Optional[float]
     
-    # NEW: For the top performance widget
+    # For the top performance widget
     run_stats: Optional[RunStats]
     
-    # NEW: For the "Mutation Workbench"
+    # For the "Mutation Workbench"
     unfixed_mutants: List[UnfixedMutation]
