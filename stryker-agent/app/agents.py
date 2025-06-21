@@ -142,14 +142,13 @@ def test_generator_agent(state: AgentState) -> AgentState:
                 "mutator_name": mutation["mutator_name"], # Provide mutator for context
                 "line": mutation["location"]["start"]["line"]
             }
-            # No need to print prompt_data, it's verbose
             
             # Check for empty or None values that could cause an invalid request
             if not all(prompt_data.values()):
                 print("ERROR: One of the prompt variables is empty. Skipping this mutation.")
                 continue
 
-            # --- REVISED PROMPT ---
+            # The fix is in the system prompt below
             prompt = ChatPromptTemplate.from_messages([
                 ("system", """You are a C# expert specializing in writing concise, effective unit tests using xUnit.
 Your goal is to write a single, complete C# xUnit test method to kill a specific mutation.
@@ -157,7 +156,7 @@ Your goal is to write a single, complete C# xUnit test method to kill a specific
 **Instructions:**
 1.  **Unique Naming:** The test method MUST have a unique and descriptive name that follows the `MethodName_Scenario_ExpectedBehavior` convention. For example: `Calculate_WhenInputIsNegative_ThrowsException`. Use the mutator type to help describe the scenario.
 2.  **Correctness:** The test must use assertions that would FAIL with the mutated code but PASS with the original code.
-3.  **Format:** Do NOT provide any explanation, comments, or surrounding text. Output ONLY the raw C# code for the new method, starting with `[Fact]` or `[Theory]` and ending with the closing brace `}`."""),
+3.  **Format:** Do NOT provide any explanation, comments, or surrounding text. Output ONLY the raw C# code for the new method, starting with `[Fact]` or `[Theory]` and ending with the closing brace `}}`."""),
                 ("user", """
                 **Source File:** `{file_path}`
                 **Existing Test File Content (to ensure name is unique):**
