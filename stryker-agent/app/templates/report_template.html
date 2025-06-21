@@ -89,6 +89,38 @@
         }
         pre[class*="language-"] { margin: 0; border-top-left-radius: 0; border-top-right-radius: 0; border: none; }
         .mutation-details { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+	/* Test Case Story Component */
+	.story-card {
+	    border: 1px solid var(--color-border);
+	    border-left: 5px solid var(--color-primary);
+	    border-radius: 12px;
+	    background-color: var(--color-surface);
+	    box-shadow: var(--shadow);
+	    margin-bottom: 2rem;
+	}
+	.story-header {
+	    padding: 1.5rem 2rem;
+	    background-color: #f3f5ff; /* Light primary color */
+	    border-bottom: 1px solid var(--color-border);
+	    border-radius: 12px 12px 0 0;
+	}
+	.story-header h3 { margin: 0; font-size: 1.25rem; }
+	.story-header p { margin: 0.25rem 0 0; color: var(--color-text-secondary); }
+	.story-body { padding: 2rem; }
+	.story-explanation {
+	    display: flex;
+	    align-items: flex-start;
+	    gap: 1.5rem;
+	    padding: 1.5rem;
+	    background-color: var(--color-bg);
+	    border-radius: 8px;
+	    margin-bottom: 2rem;
+	}
+	.story-explanation ion-icon { font-size: 2rem; color: var(--color-primary); flex-shrink: 0; margin-top: 0.25rem; }
+	.story-explanation p { margin: 0; line-height: 1.6; }
+	.story-explanation strong { font-weight: 600; }
+	
     </style>
 </head>
 <body>
@@ -168,37 +200,49 @@
             </div>
             {% endif %}
 
-            <!-- 4. Detailed Findings -->
-            {% if state.survived_mutations %}
-            <h2>Detailed Findings: Survived Mutations</h2>
-            {% for mutation, test in zip(state.survived_mutations, state.generated_tests) %}
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
-                    <div>
-                        <h3 style="margin: 0; font-size: 1.2rem;">Mutation in <code>{{ mutation.file_path }}</code></h3>
-                        <p style="margin: 0.25rem 0 0; color: var(--color-text-secondary);">Line {{ mutation.location.start.line }} • Mutator: {{ mutation.mutator_name }}</p>
-                    </div>
-                </div>
-                
-                <div class="mutation-details">
-                    <div class="code-block">
-                        <div class="code-block-header">Original Code (Killed)</div>
-                        <pre><code class="language-csharp">{{ mutation.original_code }}</code></pre>
-                    </div>
-                    <div class="code-block">
-                        <div class="code-block-header">Mutated Code (Survived)</div>
-                        <pre><code class="language-csharp">{{ mutation.mutated_code }}</code></pre>
-                    </div>
-                </div>
-                <hr style="border: 0; height: 1px; background-color: var(--color-border); margin: 2rem 0;">
-                <h4 style="font-size: 1.1rem; font-weight: 600;">AI-Generated Test</h4>
-                 <div class="code-block">
-                    <div class="code-block-header">{{ test.target_test_file }}</div>
-                    <pre><code class="language-csharp">{{ test.generated_test_code }}</code></pre>
-                </div>
-            </div>
-            {% endfor %}
-            {% endif %}
+            <!-- 4. Detailed Findings as Test Case Stories -->
+		{% if state.survived_mutations %}
+		<h2>Test Case Stories</h2>
+		{% for mutation, test in zip(state.survived_mutations, state.generated_tests) %}
+		<div class="story-card">
+		    <div class="story-header">
+		        <h3>Test Case for <code>{{ mutation.file_path.split('/')[-1] }}</code></h3>
+		        <p>Location: Line {{ mutation.location.start.line }} • Mutator: {{ mutation.mutator_name }}</p>
+		    </div>
+		    <div class="story-body">
+		        
+		        <div class="story-explanation">
+		            <ion-icon name="bulb-outline"></ion-icon>
+		            <p><strong>AI Analysis:</strong> {{ test.explanation }}</p>
+		        </div>
+		
+		        <div class="mutation-details">
+		            <div class="code-block">
+		                <div class="code-block-header">Vulnerability: The Original Code</div>
+		                <pre><code class="language-csharp">{{ mutation.original_code }}</code></pre>
+		            </div>
+		            <div class="code-block">
+		                <div class="code-block-header">Antagonist: The Survived Mutant</div>
+		                <pre><code class="language-csharp">{{ mutation.mutated_code }}</code></pre>
+		            </div>
+		        </div>
+		
+		        <hr style="border: 0; height: 1px; background-color: var(--color-border); margin: 2.5rem 0;">
+		
+		        <div>
+		            <h4 style="font-size: 1.1rem; font-weight: 600; display:flex; align-items:center; gap: 0.5rem;">
+		                <ion-icon name="shield-checkmark-outline" style="color: var(--color-success);"></ion-icon>
+		                The Solution: AI-Generated Test
+		            </h4>
+		            <div class="code-block">
+		                <div class="code-block-header">{{ test.target_test_file }}</div>
+		                <pre><code class="language-csharp">{{ test.generated_test_code }}</code></pre>
+		            </div>
+		        </div>
+		    </div>
+		</div>
+		{% endfor %}
+		{% endif %}
         </main>
     </div>
 
