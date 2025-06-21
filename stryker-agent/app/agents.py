@@ -11,8 +11,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers.string import StrOutputParser
 from state import AgentState, SurvivedMutation, GeneratedTest
 from tools import read_file, find_test_file, write_file, GitTool, GitHubApiTool
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.pydantic_v1 import BaseModel, Field
 
 # --- Initialize Gemini Model ---
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", temperature=0.2)
@@ -143,31 +141,9 @@ def report_analyst_agent(state: AgentState) -> AgentState:
     print(f"Detailed Stats: {state['mutation_stats']}")
     return state
 
-# NEW: Define the desired JSON output structure for the LLM
-class TestAndExplanation(BaseModel):
-    test_code: str = Field(description="The complete, raw C# xUnit test method code, starting with [Fact] or [Theory].")
-    explanation: str = Field(description="A concise, step-by-step explanation of why this new test kills the mutation. Explain the specific scenario and the assertion.")
-
-def _extract_json_from_markdown(raw_output: str) -> str:
-    """
-    Extracts a JSON object from a string that might be wrapped in markdown fences.
-    It looks for ```json ... ``` and returns only the content inside.
-    """
-    # The regex now looks for an optional "json" language tag and captures the object
-    match = re.search(r"```(?:json)?\s*({.*?})\s*```", raw_output, re.DOTALL)
-    if match:
-        # If a markdown block is found, return its content (the JSON object)
-        return match.group(1).strip()
-    else:
-        # Otherwise, assume the entire raw output is the JSON and strip it
-        return raw_output.strip()
-
-
 def test_generator_agent(state: AgentState) -> AgentState:
-    print("--- AGENT: Generating Unit Tests with Explanations ---")
+    print("--- AGENT: Generating Unit Tests ---")
     if state.get("error_message"): return state
-    
-    parser = JsonOutputParser(pydantic_object=TestAndExplanation)
 
     generated_tests: list[GeneratedTest] = []
     for mutation in state["survived_mutations"]:
@@ -180,17 +156,33 @@ def test_generator_agent(state: AgentState) -> AgentState:
         try:
             existing_tests = read_file.invoke(target_test_file)
             
-            print(f"--- Preparing to generate test & story for {mutation['file_path']} ---")
+            print(f"--- Preparing to generate test for {mutation['file_path']} ---")
+            prompt_data = {
+                "file_path": mutation["file_path"],
+                "existing_tests": existing_tests,
+                "original_code": mutation["original_code"],
+                "mutated_code": mutation["mutated_code"],
+                "mutator_name": mutation["mutator_name"], # Provide mutator for context
+                "line": mutation["location"]["start"]["line"]
+            }
             
-            prompt = ChatPromptTemplate.from_messages([
-                 ("system", """You are a C# testing expert. Your task is to write a new xUnit test to kill a mutation AND explain your reasoning.
-You must provide your response in a JSON format with two keys: "test_code" and "explanation".
+            # Check for empty or None values that could cause an invalid request
+            if not all(prompt_data.values()):
+                print("ERROR: One of the prompt variables is empty. Skipping this mutation.")
+                continue
 
-- "test_code": The complete, raw C# test method code. Follow the `MethodName_Scenario_ExpectedBehavior` naming convention.
-- "explanation": A short, clear narrative. Describe the specific edge case the original tests missed and how the new assertion explicitly covers that vulnerability."""),
+            # The fix is in the system prompt below
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", """You are a C# expert specializing in writing concise, effective unit tests using xUnit.
+Your goal is to write a single, complete C# xUnit test method to kill a specific mutation.
+
+**Instructions:**
+1.  **Unique Naming:** The test method MUST have a unique and descriptive name that follows the `MethodName_Scenario_ExpectedBehavior` convention. For example: `Calculate_WhenInputIsNegative_ThrowsException`. Use the mutator type to help describe the scenario.
+2.  **Correctness:** The test must use assertions that would FAIL with the mutated code but PASS with the original code.
+3.  **Format:** Do NOT provide any explanation, comments, or surrounding text. Output ONLY the raw C# code for the new method, starting with `[Fact]` or `[Theory]` and ending with the closing brace `}}`."""),
                 ("user", """
                 **Source File:** `{file_path}`
-                **Existing Test File Content:**
+                **Existing Test File Content (to ensure name is unique):**
                 ```csharp
                 {existing_tests}
                 ```
@@ -199,49 +191,32 @@ You must provide your response in a JSON format with two keys: "test_code" and "
                 - **Original Code:** `{original_code}`
                 - **Mutated Code (that survived):** `{mutated_code}`
                 - **Mutator Type:** `{mutator_name}`
+                - **Location:** Line {line}
                 ---
-                Please provide the JSON object containing the new test and its explanation.
+                Please provide one new, complete xUnit test method to kill this mutation.
                 """)]
             )
             
-            # --- MODIFIED LOGIC ---
-            # 1. Chain to get the raw string output from the LLM
             chain = prompt | llm | StrOutputParser()
-            raw_llm_output = chain.invoke({
-                "file_path": mutation["file_path"],
-                "existing_tests": existing_tests,
-                "original_code": mutation["original_code"],
-                "mutated_code": mutation["mutated_code"],
-                "mutator_name": mutation["mutator_name"]
-            })
+            raw_llm_output = chain.invoke(prompt_data)
 
-            # 2. Defensively clean the output to remove markdown fences
-            cleaned_json_string = _extract_json_from_markdown(raw_llm_output)
+            # --- ADDED CLEANUP AND VALIDATION STEP ---
+            new_test_code = _extract_csharp_code(raw_llm_output)
 
-            # 3. Manually parse the cleaned string
-            ai_response = parser.parse(cleaned_json_string)
-
-            # 4. Proceed with the validated data
-            cleaned_code = _extract_csharp_code(ai_response["test_code"])
-
-            if not cleaned_code:
-                print(f"ERROR: LLM returned an empty code block. Skipping.")
+            if not new_test_code:
+                print(f"ERROR: LLM returned an empty or invalid code block for mutation in {mutation['file_path']}. Skipping.")
                 continue
 
             generated_tests.append({
                 "target_test_file": target_test_file,
-                "generated_test_code": cleaned_code,
-                "explanation": ai_response["explanation"]
+                "generated_test_code": new_test_code
             })
-            print(f"✅ Successfully generated test and story for mutation in {mutation['file_path']}")
+            print(f"✅ Successfully generated test for mutation in {mutation['file_path']}")
         except Exception as e:
-            print(f"ERROR: Failed to generate test story for {mutation['file_path']} due to: {e}")
-            # Optionally log the raw output for debugging
-            # print(f"--- RAW LLM OUTPUT ON FAILURE ---\n{raw_llm_output}\n---------------------------------")
+            print(f"ERROR: Failed to generate test for {mutation['file_path']} due to: {e}")
 
     state["generated_tests"] = generated_tests
     return state
-
 
 def code_integration_agent(state: AgentState) -> AgentState:
     print("--- AGENT: Integrating Code and Creating PR ---")
