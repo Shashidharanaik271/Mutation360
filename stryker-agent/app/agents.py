@@ -1,38 +1,28 @@
 import os
 import json
-import re # Import the regular expression module
-import textwrap 
+import re
+import textwrap
 import subprocess
 import traceback
-from collections import Counter # Add this import at the top of agents.py
+import time # NEW: For timing the run
+from collections import Counter
 from jinja2 import Environment, FileSystemLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers.string import StrOutputParser
-from state import AgentState, SurvivedMutation, GeneratedTest
+from langchain_core.output_parsers.json import JsonOutputParser # NEW: For structured output
+from state import AgentState, SurvivedMutation, GeneratedTest, UnfixedMutation
 from tools import read_file, find_test_file, write_file, GitTool, GitHubApiTool
 
 # --- Initialize Gemini Model ---
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", temperature=0.2)
 
-# --- Helper function to clean LLM output ---
-def _extract_csharp_code(raw_output: str) -> str:
-    """
-    Extracts C# code from a raw LLM output string.
-    It looks for a ```csharp ... ``` block and returns its content.
-    If no block is found, it assumes the entire string is the code.
-    """
-    # Regex to find code inside ```csharp ... ```, handling potential newlines
-    match = re.search(r"```csharp\s*(.*?)\s*```", raw_output, re.DOTALL)
-    if match:
-        # If a markdown block is found, return its content, stripped of whitespace
-        return match.group(1).strip()
-    else:
-        # Otherwise, assume the entire raw output is the code and strip it
-        return raw_output.strip()
+# --- Helper function to clean LLM output (NO LONGER NEEDED FOR TEST GEN) ---
+# We will use JSON output parser instead for more robust extraction.
 
 def mutation_runner_agent(state: AgentState) -> AgentState:
     print("--- AGENT: Running Mutation Tests ---")
+    state['run_stats'] = { "analysis_time_seconds": 0 } # Initialize
+    start_time = time.time()
     try:
         command = [
             "dotnet", "stryker",
@@ -46,7 +36,6 @@ def mutation_runner_agent(state: AgentState) -> AgentState:
             cwd="/repo", capture_output=True, text=True
         )
 
-        # Always print the output for debugging
         print("--- Stryker STDOUT ---")
         print(result.stdout)
         print("--- Stryker STDERR ---")
@@ -54,7 +43,6 @@ def mutation_runner_agent(state: AgentState) -> AgentState:
             print(result.stderr)
         print("----------------------")
 
-        # --- REVISED LOGIC: Prioritize finding the report file ---
         report_file_name = "stryker-report.json"
         stryker_output_dir = "/repo/StrykerOutput"
         found_report_path = None
@@ -67,14 +55,10 @@ def mutation_runner_agent(state: AgentState) -> AgentState:
                     found_report_path = os.path.relpath(full_path, "/repo")
                     break
         
-        # Now, check if we found what we need
         if found_report_path:
-            # SUCCESS! We have the report, so we can continue.
             print(f"✅ Stryker report found at: {found_report_path}")
             state["stryker_report_path"] = found_report_path
         else:
-            # FAILURE! The report was not generated.
-            # Now we create a detailed error message.
             state["error_message"] = (
                 "Stryker run did not produce a 'stryker-report.json' file. "
                 f"Stryker exited with code {result.returncode}. "
@@ -83,8 +67,23 @@ def mutation_runner_agent(state: AgentState) -> AgentState:
 
     except Exception as e:
         state["error_message"] = f"An unexpected error occurred in the mutation runner: {str(e)}"
+    finally:
+        end_time = time.time()
+        state['run_stats']['analysis_time_seconds'] = int(end_time - start_time)
     
     return state
+
+def _assess_risk(mutator_name: str) -> tuple[str, str]:
+    """Assigns a risk level based on the mutator type."""
+    high_risk = ["Block", "Statement", "Linq", "Equality", "Arithmetic"]
+    if any(term in mutator_name for term in high_risk):
+        return ('HIGH', '🔥')
+    
+    medium_risk = ["Method", "Update", "Boolean"]
+    if any(term in mutator_name for term in medium_risk):
+        return ('MEDIUM', '⚠️')
+        
+    return ('LOW', '⚪')
 
 def report_analyst_agent(state: AgentState) -> AgentState:
     print("--- AGENT: Analyzing Report ---")
@@ -93,7 +92,6 @@ def report_analyst_agent(state: AgentState) -> AgentState:
     report_content = json.loads(read_file.invoke(state["stryker_report_path"]))
     state["mutation_score"] = report_content.get("mutationScore", 0.0)
     
-    # --- NEW: Detailed stat collection ---
     all_mutants = []
     for file_report in report_content.get("files", {}).values():
         all_mutants.extend(file_report.get("mutants", []))
@@ -107,23 +105,38 @@ def report_analyst_agent(state: AgentState) -> AgentState:
         "no_coverage": status_counts.get("NoCoverage", 0),
         "compile_error": status_counts.get("CompileError", 0)
     }
-    # --- END NEW ---
 
-    survived: list[SurvivedMutation] = []
+    survived_mutations: list[SurvivedMutation] = []
+    unfixed_mutants: list[UnfixedMutation] = []
     survived_mutator_names = []
+    survived_file_paths = []
+
     for file_path, file_report in report_content.get("files", {}).items():
         relative_path = os.path.relpath(file_path, "/repo")
         source_context = read_file.invoke(relative_path)
         source_lines = source_context.splitlines()
         
         for mutant in file_report.get("mutants", []):
-            if mutant["status"] == "Survived":
-                start_line = mutant["location"]["start"]["line"]
-                end_line = mutant["location"]["end"]["line"]
-                original_code_lines = source_lines[start_line - 1 : end_line]
-                original_code = "\n".join(original_code_lines)
+            start_line = mutant["location"]["start"]["line"]
+            end_line = mutant["location"]["end"]["line"]
+            original_code_lines = source_lines[start_line - 1 : end_line]
+            original_code = "\n".join(original_code_lines)
 
-                survived.append({
+            if mutant["status"] in ["Survived", "NoCoverage"]:
+                risk_level, risk_icon = _assess_risk(mutant["mutatorName"])
+                unfixed_mutants.append({
+                    "file_path": relative_path,
+                    "mutator_name": mutant["mutatorName"],
+                    "status": mutant["status"],
+                    "line": start_line,
+                    "original_code": original_code,
+                    "mutated_code": mutant["replacement"],
+                    "risk_level": risk_level,
+                    "risk_icon": risk_icon
+                })
+
+            if mutant["status"] == "Survived":
+                survived_mutations.append({
                     "file_path": relative_path,
                     "mutator_name": mutant["mutatorName"],
                     "original_code": original_code,
@@ -132,13 +145,24 @@ def report_analyst_agent(state: AgentState) -> AgentState:
                     "source_code_context": source_context
                 })
                 survived_mutator_names.append(mutant["mutatorName"])
+                survived_file_paths.append(relative_path)
 
-    state["survived_mutations"] = survived
-    # --- NEW: Count survived mutants by type ---
+    state["survived_mutations"] = survived_mutations
+    state["unfixed_mutants"] = unfixed_mutants
     state["survived_by_mutator"] = Counter(survived_mutator_names)
+    state["survived_by_file"] = Counter(survived_file_paths)
     
-    print(f"Analysis complete. Mutation Score: {state['mutation_score']}. Survived: {len(survived)}")
-    print(f"Detailed Stats: {state['mutation_stats']}")
+    # --- NEW: Calculate Projected Score ---
+    stats = state["mutation_stats"]
+    valid_mutants = stats["total_mutants"] - stats["no_coverage"] - stats["compile_error"]
+    if valid_mutants > 0:
+        # The projected score assumes all 'Survived' mutants will be 'Killed'
+        projected_killed = stats["killed"] + stats["survived"]
+        state["projected_score"] = (projected_killed / valid_mutants) * 100
+    else:
+        state["projected_score"] = state["mutation_score"]
+
+    print(f"Analysis complete. Survived: {len(survived_mutations)}. Unfixed: {len(unfixed_mutants)}")
     return state
 
 def test_generator_agent(state: AgentState) -> AgentState:
@@ -162,24 +186,32 @@ def test_generator_agent(state: AgentState) -> AgentState:
                 "existing_tests": existing_tests,
                 "original_code": mutation["original_code"],
                 "mutated_code": mutation["mutated_code"],
-                "mutator_name": mutation["mutator_name"], # Provide mutator for context
+                "mutator_name": mutation["mutator_name"],
                 "line": mutation["location"]["start"]["line"]
             }
             
-            # Check for empty or None values that could cause an invalid request
             if not all(prompt_data.values()):
                 print("ERROR: One of the prompt variables is empty. Skipping this mutation.")
                 continue
 
-            # The fix is in the system prompt below
+            # NEW: Updated prompt for JSON output
             prompt = ChatPromptTemplate.from_messages([
                 ("system", """You are a C# expert specializing in writing concise, effective unit tests using xUnit.
 Your goal is to write a single, complete C# xUnit test method to kill a specific mutation.
 
 **Instructions:**
-1.  **Unique Naming:** The test method MUST have a unique and descriptive name that follows the `MethodName_Scenario_ExpectedBehavior` convention. For example: `Calculate_WhenInputIsNegative_ThrowsException`. Use the mutator type to help describe the scenario.
-2.  **Correctness:** The test must use assertions that would FAIL with the mutated code but PASS with the original code.
-3.  **Format:** Do NOT provide any explanation, comments, or surrounding text. Output ONLY the raw C# code for the new method, starting with `[Fact]` or `[Theory]` and ending with the closing brace `}}`."""),
+1.  **Analyze:** Understand why the mutated code was not caught by existing tests.
+2.  **Explain:** Write a brief, one-sentence explanation for *why* this new test is necessary. Focus on the specific scenario or edge case it covers.
+3.  **Code:** Write a single, complete C# xUnit test method. The method MUST have a unique and descriptive name.
+4.  **Format:** Respond with a single JSON object containing two keys: "explanation" and "code". Do NOT output any other text or markdown.
+
+Example Response:
+```json
+{{
+  "explanation": "This test validates that the method correctly handles null input for the customer name, which was not previously covered.",
+  "code": "[Fact]\\npublic void Calculate_WhenCustomerNameIsNull_ThrowsArgumentNullException()\\n{{\\n    // ... test code ...\\n}}"
+}}
+```"""),
                 ("user", """
                 **Source File:** `{file_path}`
                 **Existing Test File Content (to ensure name is unique):**
@@ -193,29 +225,35 @@ Your goal is to write a single, complete C# xUnit test method to kill a specific
                 - **Mutator Type:** `{mutator_name}`
                 - **Location:** Line {line}
                 ---
-                Please provide one new, complete xUnit test method to kill this mutation.
+                Please provide the JSON object containing the explanation and the new xUnit test method.
                 """)]
             )
             
-            chain = prompt | llm | StrOutputParser()
-            raw_llm_output = chain.invoke(prompt_data)
+            # NEW: Using JSON output parser
+            parser = JsonOutputParser()
+            chain = prompt | llm | parser
+            response_json = chain.invoke(prompt_data)
 
-            # --- ADDED CLEANUP AND VALIDATION STEP ---
-            new_test_code = _extract_csharp_code(raw_llm_output)
-
-            if not new_test_code:
-                print(f"ERROR: LLM returned an empty or invalid code block for mutation in {mutation['file_path']}. Skipping.")
+            if not response_json.get("code") or not response_json.get("explanation"):
+                print(f"ERROR: LLM returned incomplete JSON for mutation in {mutation['file_path']}. Skipping.")
                 continue
 
             generated_tests.append({
                 "target_test_file": target_test_file,
-                "generated_test_code": new_test_code
+                "generated_test_code": response_json["code"],
+                "explanation": response_json["explanation"]
             })
             print(f"✅ Successfully generated test for mutation in {mutation['file_path']}")
         except Exception as e:
             print(f"ERROR: Failed to generate test for {mutation['file_path']} due to: {e}")
 
     state["generated_tests"] = generated_tests
+    # NEW: Populate final run stat
+    if state.get('run_stats'):
+        state['run_stats']['tests_generated'] = len(generated_tests)
+        state['run_stats']['mutants_generated'] = state['mutation_stats']['total_mutants']
+        state['run_stats']['survivors_found'] = state['mutation_stats']['survived']
+
     return state
 
 def code_integration_agent(state: AgentState) -> AgentState:
@@ -243,24 +281,14 @@ def code_integration_agent(state: AgentState) -> AgentState:
             last_brace_index = content.rfind("}")
 
             if last_brace_index != -1:
-                # --- CORRECTED INDENTATION LOGIC ---
-                # Define the standard indentation (4 spaces is a common C# standard)
                 indentation = "    "
-                
-                # Indent every line of the generated test code
                 indented_test_code = textwrap.indent(test["generated_test_code"], indentation)
-
-                # Insert the correctly indented code block
                 new_content = (
-                    content[:last_brace_index].rstrip() + # Get content before the last brace
-                    f"\n\n{indented_test_code}\n" +      # Add a blank line and the new indented method
-                    content[last_brace_index:]           # Add the final brace back
+                    content[:last_brace_index].rstrip() +
+                    f"\n\n{indented_test_code}\n" +
+                    content[last_brace_index:]
                 )
-                
-                write_file.invoke({
-                    "file_path": file_path,
-                    "content": new_content
-                })
+                write_file.invoke({ "file_path": file_path, "content": new_content })
             else:
                 raise ValueError(f"Could not find closing brace in {file_path}")
 
@@ -301,8 +329,6 @@ def code_integration_agent(state: AgentState) -> AgentState:
 def dashboard_generator_agent(state: AgentState) -> AgentState:
     print("--- AGENT: Generating Dashboard ---")
     env = Environment(loader=FileSystemLoader('/app/templates'))
-    
-    # Add the built-in zip function to the template environment
     env.globals['zip'] = zip
     
     template = env.get_template('report_template.html')

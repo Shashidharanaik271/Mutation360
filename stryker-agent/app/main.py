@@ -26,11 +26,14 @@ def main():
     except FileNotFoundError as e:
         print(f"❌ Error: {e}", file=sys.stderr)
         sys.exit(1)
+        
     initial_state: AgentState = {
+        # Inputs
         "project_path": project_path,
         "repo_slug": os.environ["GITHUB_REPOSITORY"],
         "source_branch": os.environ["SOURCE_BRANCH"],
         "pr_number": int(os.environ["PR_NUMBER"]),
+        # Core State
         "stryker_report_path": None,
         "mutation_score": 0.0,
         "survived_mutations": [],
@@ -38,6 +41,13 @@ def main():
         "new_branch_name": None,
         "new_pr_url": None,
         "error_message": None,
+        # New Reporting Fields
+        "mutation_stats": None,
+        "survived_by_mutator": None,
+        "survived_by_file": None,
+        "projected_score": None,
+        "run_stats": None,
+        "unfixed_mutants": [],
     }
     app = create_graph()
     app.invoke(initial_state)

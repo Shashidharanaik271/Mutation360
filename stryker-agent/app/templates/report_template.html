@@ -2,16 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>AI Mutation Test Report</title>
+    <title>AI Mutation Testing Report</title>
     
-    <!-- 1. Modern UI Dependencies -->
+    <!-- 1. Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
 
-    <!-- 2. The New Design System (CSS) -->
+    <!-- 2. Design System (CSS) -->
     <style>
         :root {
             --color-bg: #f8f9fa;
@@ -32,172 +32,185 @@
             background-color: var(--color-bg);
             color: var(--color-text-primary);
         }
-        .container {
-            max-width: 1280px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-        h1, h2 { font-weight: 700; }
-        h1 { font-size: 2.25rem; }
-        h2 { font-size: 1.5rem; margin-top: 2.5rem; margin-bottom: 1.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--color-border); }
-        .card {
-            background-color: var(--color-surface);
-            border-radius: 12px;
-            padding: 2rem;
-            margin-bottom: 1.5rem;
-            box-shadow: var(--shadow);
-            border: 1px solid var(--color-border);
-        }
-        /* Status Banner */
-        .status-banner {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-            padding: 1.5rem 2rem;
-            border-left-width: 6px;
-        }
-        .status-banner ion-icon { font-size: 3rem; }
-        .status-banner h3 { margin: 0; font-size: 1.25rem; font-weight: 600; }
-        .status-banner p, .status-banner a { margin: 0.25rem 0 0; color: var(--color-text-secondary); }
-        .status-banner.success { border-left-color: var(--color-success); background-color: #f0fdf4; }
-        .status-banner.success ion-icon { color: var(--color-success); }
-        .status-banner.action-required { border-left-color: var(--color-primary); background-color: #f3f5ff; }
-        .status-banner.action-required ion-icon { color: var(--color-primary); }
-        .status-banner.failure { border-left-color: var(--color-danger); background-color: #fff5f5; }
-        .status-banner.failure ion-icon { color: var(--color-danger); }
-
-        /* Summary Grid */
-        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; }
-        .summary-card { text-align: center; }
-        .summary-card .value { font-size: 3rem; font-weight: 700; }
-        .summary-card .label { font-size: 1rem; font-weight: 500; color: var(--color-text-secondary); }
+        .container { max-width: 1280px; margin: 0 auto; padding: 2rem; }
+        h1, h2, h3, h4 { font-weight: 700; color: var(--color-text-primary); }
+        h1 { font-size: 2rem; }
+        h2 { font-size: 1.5rem; margin-top: 3rem; margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); }
+        .card { background-color: var(--color-surface); border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; box-shadow: var(--shadow); border: 1px solid var(--color-border); }
         
-        /* Charts */
-        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
-        .chart-container { height: 380px; }
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        .header-meta { color: var(--color-text-secondary); font-size: 0.9rem; }
+        
+        /* Impact Card */
+        .impact-card .projection-bars { margin-top: 1.5rem; }
+        .projection-bars .bar-label { font-weight: 500; width: 100px; color: var(--color-text-secondary); }
+        .projection-bars .bar-container { flex-grow: 1; background-color: #e9ecef; border-radius: 8px; height: 24px; }
+        .projection-bars .bar { height: 100%; border-radius: 8px; transition: width 0.5s ease-out; }
+        .projection-bars .current-bar { background-color: var(--color-warning); }
+        .projection-bars .projected-bar { background: linear-gradient(90deg, var(--color-warning) 0%, var(--color-success) 100%); }
+        .projection-bars .value { font-weight: 600; margin-left: 1rem; }
+        .pr-button { display: inline-block; background-color: var(--color-primary); color: white; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 1.5rem; transition: background-color 0.2s; }
+        .pr-button:hover { background-color: #364fc7; }
 
-        /* Code Snippets */
-        .code-block { margin-top: 1rem; }
-        .code-block-header {
-            background-color: #3a3f4b; /* Darker than tomorrow theme */
-            color: #ccc;
-            padding: 0.75rem 1.25rem;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-            font-family: monospace;
-            font-size: 0.9rem;
-        }
+        /* Stats & Charts */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.5rem; }
+        .stat-card { text-align: center; padding: 1rem; background-color: #f8f9fa; border-radius: 8px; }
+        .stat-card .value { font-size: 2rem; font-weight: 700; }
+        .stat-card .label { font-size: 0.9rem; color: var(--color-text-secondary); }
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; align-items: start; }
+        .chart-container { height: 350px; }
+
+        /* Test Case Story */
+        .story-card .ai-analysis { background-color: #f3f5ff; border-left: 4px solid var(--color-primary); padding: 1rem 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; }
+        .story-card .ai-analysis ion-icon { color: var(--color-primary); font-size: 1.2rem; vertical-align: middle; margin-right: 0.5rem; }
+        .code-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .code-block-header { background-color: #3a3f4b; color: #ccc; padding: 0.75rem 1.25rem; border-top-left-radius: 8px; border-top-right-radius: 8px; font-family: monospace; font-size: 0.9rem; }
         pre[class*="language-"] { margin: 0; border-top-left-radius: 0; border-top-right-radius: 0; border: none; }
-        .mutation-details { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+        /* Workbench Table */
+        .workbench-table { width: 100%; border-collapse: collapse; }
+        .workbench-table th, .workbench-table td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--color-border); }
+        .workbench-table th { font-weight: 600; color: var(--color-text-secondary); font-size: 0.85rem; text-transform: uppercase; }
+        .workbench-table td { font-size: 0.95rem; }
+        .risk-badge { padding: 0.25rem 0.75rem; border-radius: 1rem; font-weight: 600; font-size: 0.8rem; }
+        .risk-high { background-color: #fff5f5; color: var(--color-danger); }
+        .risk-medium { background-color: #fff9db; color: #e8590c; }
+        .risk-low { background-color: #f8f9fa; color: var(--color-text-secondary); }
+        .summon-button { background: none; border: 1px solid var(--color-primary); color: var(--color-primary); padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .summon-button:hover { background-color: #f3f5ff; }
     </style>
 </head>
 <body>
     <div class="container">
-        <header style="margin-bottom: 2rem;">
-            <h1>AI Mutation Testing Report</h1>
+        <header class="header">
+            <h1>AI Analyst Report</h1>
+            <div class="header-meta">
+                For PR #{{ state.pr_number }} into <code>{{ state.source_branch }}</code>
+            </div>
         </header>
 
         <main>
-            <!-- 1. High-Level Status Banner -->
-            {% if state.error_message %}
-            <div class="card status-banner failure">
-                <ion-icon name="close-circle"></ion-icon>
-                <div>
-                    <h3>Operation Failed</h3>
-                    <p>{{ state.error_message }}</p>
-                </div>
-            </div>
-            {% elif state.new_pr_url %}
-            <div class="card status-banner action-required">
-                <ion-icon name="git-pull-request"></ion-icon>
-                <div>
-                    <h3>Action Required: Review Corrective PR</h3>
-                    <p>The agent generated new tests and created a pull request.</p>
-                    <a href="{{ state.new_pr_url }}" target="_blank">View Pull Request →</a>
-                </div>
-            </div>
-            {% else %}
-            <div class="card status-banner success">
-                <ion-icon name="checkmark-circle"></ion-icon>
-                <div>
-                    <h3>Analysis Complete</h3>
-                    <p>No surviving mutations required new tests. Great job!</p>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- 2. Key Metrics -->
             {% if not state.error_message %}
+            <!-- 1. Agent Impact Projection -->
+            <div class="card impact-card">
+                <h3 style="margin:0;">Agent Impact Projection</h3>
+                <p style="margin-top:0.25rem; color: var(--color-text-secondary);">The agent's PR will directly improve your code's test quality.</p>
+                <div class="projection-bars">
+                    <div style="display: flex; align-items: center; margin-bottom: 0.75rem;">
+                        <div class="bar-label">Current</div>
+                        <div class="bar-container"><div class="bar current-bar" style="width: {{ state.mutation_score }}%;"></div></div>
+                        <div class="value">{{ "%.1f"|format(state.mutation_score) }}%</div>
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <div class="bar-label">After Merge</div>
+                        <div class="bar-container"><div class="bar projected-bar" style="width: {{ state.projected_score }}%;"></div></div>
+                        <div class="value">{{ "%.1f"|format(state.projected_score) }}%</div>
+                    </div>
+                </div>
+                {% if state.new_pr_url %}
+                <a href="{{ state.new_pr_url }}" target="_blank" class="pr-button">
+                    <ion-icon name="git-pull-request-outline" style="vertical-align: middle; margin-right: 0.5rem;"></ion-icon>
+                    View Corrective Pull Request
+                </a>
+                {% endif %}
+            </div>
+
+            <!-- 2. Data Deep Dive -->
+            <h2>Data Deep Dive: Visual Analytics</h2>
             <div class="card">
-                <div class="summary-grid">
-                    <div class="summary-card">
-                        <div class="value" style="color: var(--color-primary);">{{ "%.1f"|format(state.mutation_score) }}%</div>
-                        <div class="label">Mutation Score</div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="value">{{ state.run_stats.analysis_time_seconds }}s</div>
+                        <div class="label">Analysis Time</div>
                     </div>
-                    <div class="summary-card">
-                        <div class="value" style="color: var(--color-danger);">{{ state.mutation_stats.survived }}</div>
-                        <div class="label">Survived</div>
+                    <div class="stat-card">
+                        <div class="value">{{ state.run_stats.mutants_generated }}</div>
+                        <div class="label">Mutants Generated</div>
                     </div>
-                    <div class="summary-card">
-                        <div class="value" style="color: var(--color-success);">{{ state.mutation_stats.killed }}</div>
-                        <div class="label">Killed</div>
+                    <div class="stat-card">
+                        <div class="value" style="color: var(--color-danger);">{{ state.run_stats.survivors_found }}</div>
+                        <div class="label">Survivors Found</div>
                     </div>
-                     <div class="summary-card">
-                        <div class="value" style="color: var(--color-warning);">{{ state.mutation_stats.no_coverage }}</div>
-                        <div class="label">No Coverage</div>
+                    <div class="stat-card">
+                        <div class="value" style="color: var(--color-success);">{{ state.run_stats.tests_generated }}</div>
+                        <div class="label">Tests Added</div>
                     </div>
+                </div>
+                <hr style="border: 0; height: 1px; background-color: var(--color-border); margin: 2rem 0;">
+                <div class="charts-grid">
+                    <div class="chart-container"><canvas id="statusChart"></canvas></div>
+                    <div class="chart-container"><canvas id="mutatorChart"></canvas></div>
+                    <div class="chart-container"><canvas id="fileHotspotsChart"></canvas></div>
                 </div>
             </div>
 
-            <!-- 3. Visual Analysis -->
-            <h2>Visual Analysis</h2>
-            <div class="card charts-grid">
-                <div class="chart-container">
-                    <canvas id="statusChart"></canvas>
-                </div>
-                <div class="chart-container">
-                    {% if state.survived_by_mutator %}
-                    <canvas id="mutatorChart"></canvas>
-                    {% else %}
-                    <div style="text-align: center; color: var(--color-text-secondary);">
-                        <ion-icon name="trophy" style="font-size: 4rem; color: var(--color-success)"></ion-icon>
-                        <p style="margin-top: 1rem;">No mutations survived!</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- 4. Detailed Findings -->
-            {% if state.survived_mutations %}
-            <h2>Detailed Findings: Survived Mutations</h2>
+            <!-- 3. Test Case Stories -->
+            {% if state.generated_tests %}
+            <h2>Test Case Stories: How the Agent Fixed Your Code</h2>
             {% for mutation, test in zip(state.survived_mutations, state.generated_tests) %}
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
-                    <div>
-                        <h3 style="margin: 0; font-size: 1.2rem;">Mutation in <code>{{ mutation.file_path }}</code></h3>
-                        <p style="margin: 0.25rem 0 0; color: var(--color-text-secondary);">Line {{ mutation.location.start.line }} • Mutator: {{ mutation.mutator_name }}</p>
-                    </div>
-                </div>
+            <div class="card story-card">
+                <h3 style="margin: 0;">Fix for <code>{{ mutation.file_path }}</code></h3>
+                <p style="margin: 0.25rem 0 1.5rem; color: var(--color-text-secondary);">Line {{ mutation.location.start.line }} • Mutator: {{ mutation.mutator_name }}</p>
                 
-                <div class="mutation-details">
-                    <div class="code-block">
-                        <div class="code-block-header">Original Code (Killed)</div>
+                <div class="ai-analysis">
+                    <ion-icon name="bulb-outline"></ion-icon>
+                    <strong>AI Analysis:</strong> {{ test.explanation }}
+                </div>
+
+                <div class="code-grid">
+                    <div>
+                        <div class="code-block-header">Original Code</div>
                         <pre><code class="language-csharp">{{ mutation.original_code }}</code></pre>
                     </div>
-                    <div class="code-block">
-                        <div class="code-block-header">Mutated Code (Survived)</div>
+                    <div>
+                        <div class="code-block-header">Survived Mutant</div>
                         <pre><code class="language-csharp">{{ mutation.mutated_code }}</code></pre>
                     </div>
                 </div>
                 <hr style="border: 0; height: 1px; background-color: var(--color-border); margin: 2rem 0;">
-                <h4 style="font-size: 1.1rem; font-weight: 600;">AI-Generated Test</h4>
-                 <div class="code-block">
-                    <div class="code-block-header">{{ test.target_test_file }}</div>
-                    <pre><code class="language-csharp">{{ test.generated_test_code }}</code></pre>
-                </div>
+                <h4 style="font-size: 1.1rem;">🛡️ The Fix: AI-Generated Test in <code>{{ test.target_test_file }}</code></h4>
+                <pre><code class="language-csharp">{{ test.generated_test_code }}</code></pre>
             </div>
             {% endfor %}
+            {% endif %}
+
+            <!-- 4. Mutation Workbench -->
+            {% if state.unfixed_mutants %}
+            <h2>The Mutation Workbench: Your AI To-Do List</h2>
+            <div class="card">
+                <p style="margin-top:0; color: var(--color-text-secondary);">The agent has identified other areas with weak test coverage. You can summon the agent to fix them in a future run.</p>
+                <table class="workbench-table">
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Mutator Type</th>
+                            <th>Status</th>
+                            <th>Est. Risk</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mutant in state.unfixed_mutants %}
+                        <tr>
+                            <td><code>{{ mutant.file_path }}:{{ mutant.line }}</code></td>
+                            <td>{{ mutant.mutator_name }}</td>
+                            <td>{{ mutant.status }}</td>
+                            <td><span class="risk-badge risk-{{ mutant.risk_level | lower }}">{{ mutant.risk_icon }} {{ mutant.risk_level }}</span></td>
+                            <td><button class="summon-button">Summon Agent 🤖</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <!-- Error Message Display -->
+            <div class="card">
+                <h2 style="color: var(--color-danger);">Operation Failed</h2>
+                <pre style="background-color: #fff5f5; padding: 1rem; border-radius: 8px; white-space: pre-wrap; word-wrap: break-word;">{{ state.error_message }}</pre>
+            </div>
             {% endif %}
         </main>
     </div>
@@ -207,54 +220,56 @@
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Data from Python state
-            const stats = {{ state.mutation_stats | tojson }};
-            const survivedByMutator = {{ state.survived_by_mutator | tojson }};
-
-            // Chart 1: Mutation Status Breakdown
-            const statusCtx = document.getElementById('statusChart').getContext('2d');
-            new Chart(statusCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Killed', 'Survived', 'No Coverage', 'Compile Error'],
-                    datasets: [{
-                        data: [stats.killed, stats.survived, stats.no_coverage, stats.compile_error],
-                        backgroundColor: ['var(--color-success)', 'var(--color-danger)', 'var(--color-warning)', '#868e96'],
-                        borderColor: 'var(--color-surface)',
-                        borderWidth: 4,
-                        hoverOffset: 8
-                    }]
-                },
-                options: {
+            const stateData = {{ state | tojson }};
+            if (!stateData.error_message) {
+                const chartOptions = (title) => ({
                     responsive: true, maintainAspectRatio: false,
                     plugins: {
                         legend: { position: 'bottom', labels: { usePointStyle: true, font: { family: 'Inter' } } },
-                        title: { display: true, text: 'Overall Mutation Status', font: { size: 16, family: 'Inter', weight: '600' } }
-                    }
-                }
-            });
-
-            // Chart 2: Survived Mutators Breakdown
-            if (survivedByMutator && Object.keys(survivedByMutator).length > 0) {
-                const mutatorCtx = document.getElementById('mutatorChart').getContext('2d');
-                new Chart(mutatorCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: Object.keys(survivedByMutator),
-                        datasets: [{
-                            data: Object.values(survivedByMutator),
-                            backgroundColor: 'var(--color-primary)',
-                            borderRadius: 4
-                        }]
-                    },
-                    options: {
-                        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false },
-                            title: { display: true, text: 'Top Survived Mutator Types', font: { size: 16, family: 'Inter', weight: '600' } }
-                        }
+                        title: { display: true, text: title, font: { size: 16, family: 'Inter', weight: '600' } }
                     }
                 });
+
+                // Chart 1: Mutation Status
+                const statusCtx = document.getElementById('statusChart').getContext('2d');
+                new Chart(statusCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Killed', 'Survived', 'No Coverage', 'Compile Error'],
+                        datasets: [{
+                            data: [stateData.mutation_stats.killed, stateData.mutation_stats.survived, stateData.mutation_stats.no_coverage, stateData.mutation_stats.compile_error],
+                            backgroundColor: ['var(--color-success)', 'var(--color-danger)', 'var(--color-warning)', '#868e96'],
+                            borderColor: 'var(--color-surface)', borderWidth: 4, hoverOffset: 8
+                        }]
+                    },
+                    options: chartOptions('Overall Mutation Status')
+                });
+
+                // Chart 2: Top Survived Mutators
+                if (stateData.survived_by_mutator && Object.keys(stateData.survived_by_mutator).length > 0) {
+                    const mutatorCtx = document.getElementById('mutatorChart').getContext('2d');
+                    new Chart(mutatorCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(stateData.survived_by_mutator),
+                            datasets: [{ data: Object.values(stateData.survived_by_mutator), backgroundColor: 'var(--color-primary)', borderRadius: 4 }]
+                        },
+                        options: { ...chartOptions('Top Survived Mutator Types'), indexAxis: 'y', plugins: { ...chartOptions('Top Survived Mutator Types').plugins, legend: { display: false } } }
+                    });
+                }
+
+                // Chart 3: File Hotspots
+                if (stateData.survived_by_file && Object.keys(stateData.survived_by_file).length > 0) {
+                    const fileCtx = document.getElementById('fileHotspotsChart').getContext('2d');
+                    new Chart(fileCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(stateData.survived_by_file),
+                            datasets: [{ data: Object.values(stateData.survived_by_file), backgroundColor: 'var(--color-danger)', borderRadius: 4 }]
+                        },
+                        options: { ...chartOptions('File Hotspots (by survivor count)'), indexAxis: 'y', plugins: { ...chartOptions('File Hotspots (by survivor count)').plugins, legend: { display: false } } }
+                    });
+                }
             }
         });
     </script>
