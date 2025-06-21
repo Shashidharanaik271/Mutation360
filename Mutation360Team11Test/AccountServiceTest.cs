@@ -235,4 +235,19 @@ public class AccountServiceTest
 		// Assert
 		Assert.Equal(string.Empty, result);
 	}
+
+    [Fact]
+            public void GetApplicationName_ApplicationIdIsOne_ReturnsEmptyString()
+            {
+                // Arrange
+                var mockExternalService = new Mock<IExternalService>();
+                var accountService = new AccountService(mockExternalService.Object);
+                int applicationId = 1;
+
+                // Act
+                var result = accountService.GetApplicationName(applicationId);
+
+                // Assert
+                Assert.Equal(string.Empty, result);
+            }
 }
