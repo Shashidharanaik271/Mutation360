@@ -218,9 +218,22 @@ def code_integration_agent(state: AgentState) -> AgentState:
             file_path = test["target_test_file"]
             content = read_file.invoke(file_path)
             last_brace_index = content.rfind("}")
+
             if last_brace_index != -1:
-                # Add extra newline for better formatting
-                new_content = content[:last_brace_index].rstrip() + f"\n\n    {test['generated_test_code']}\n" + content[last_brace_index:]
+                # --- CORRECTED INDENTATION LOGIC ---
+                # Define the standard indentation (4 spaces is a common C# standard)
+                indentation = "    "
+                
+                # Indent every line of the generated test code
+                indented_test_code = textwrap.indent(test["generated_test_code"], indentation)
+
+                # Insert the correctly indented code block
+                new_content = (
+                    content[:last_brace_index].rstrip() + # Get content before the last brace
+                    f"\n\n{indented_test_code}\n" +      # Add a blank line and the new indented method
+                    content[last_brace_index:]           # Add the final brace back
+                )
+                
                 write_file.invoke({
                     "file_path": file_path,
                     "content": new_content
@@ -246,9 +259,8 @@ def code_integration_agent(state: AgentState) -> AgentState:
         Please review and merge this PR into your feature branch (`{state['source_branch']}`) to ensure your changes are robust before merging to `master`.
         """
         
-        # Call the method directly on the instance, not through .invoke()
         pr_url = github_tool.create_pull_request.func(
-            github_tool, # Explicitly pass the instance as 'self'
+            github_tool,
             head_branch=branch_name,
             base_branch=state["source_branch"],
             title=pr_title,
