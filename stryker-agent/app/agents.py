@@ -12,7 +12,7 @@ from state import AgentState, SurvivedMutation, GeneratedTest
 from tools import read_file, find_test_file, write_file, GitTool, GitHubApiTool
 
 # --- Initialize Gemini Model ---
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", temperature=0.2)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", temperature=0.2)
 
 # --- Helper function to clean LLM output ---
 def _extract_csharp_code(raw_output: str) -> str:
