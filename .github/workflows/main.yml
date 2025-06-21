@@ -9,25 +9,36 @@ jobs:
   run-ai-agent:
     runs-on: ubuntu-latest
     permissions:
+      # These permissions are correct and necessary for the agent
       pull-requests: write
       contents: write
 
     steps:
-      - name: Checkout Feature Branch Code
+      # --- FIX: STEP 1 ---
+      # Checkout the master branch which contains the trusted AI agent code.
+      - name: 1. Checkout Agent Code (from master branch)
         uses: actions/checkout@v4
         with:
-          # Fetch all history for all branches so we can checkout correctly
-          fetch-depth: 0
+          ref: 'master'         # Explicitly check out the master branch
+          path: 'agent_code'    # Place it in a separate directory
 
-      - name: Ensure we are on the correct branch
-        run: git checkout ${{ github.head_ref }}
+      # --- FIX: STEP 2 ---
+      # Checkout the feature branch that triggered the workflow. This is the code we want to test.
+      - name: 2. Checkout Feature Branch Code (to be tested)
+        uses: actions/checkout@v4
+        with:
+          path: 'repo_to_test'  # Place it in another directory
 
-      - name: Build and Run AI Agent Docker Container
+      # --- FIX: STEP 3 ---
+      # Build the Docker image using the agent's code from the 'master' branch checkout.
+      # Then, run the container, mounting only the code-to-be-tested into the '/repo' directory.
+      - name: 3. Build and Run AI Agent
         run: |
-          docker build --no-cache -t stryker-agent -f ./stryker-agent/Dockerfile ./stryker-agent
+          # Build the image from the 'agent_code' directory
+          docker build --no-cache -t stryker-agent -f ./agent_code/stryker-agent/Dockerfile ./agent_code/stryker-agent
           
           docker run --rm \
-            -v "$(pwd)":/repo \
+            -v "$(pwd)/repo_to_test":/repo \
             -e GITHUB_TOKEN="${{ secrets.GH_PAT }}" \
             -e GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
             -e GITHUB_REPOSITORY="${{ github.repository }}" \
@@ -35,8 +46,10 @@ jobs:
             -e SOURCE_BRANCH="${{ github.head_ref }}" \
             stryker-agent
 
-      - name: Upload Mutation Report as Artifact
+      # --- FIX: STEP 4 ---
+      # The dashboard is created inside the '/repo' volume, which corresponds to the 'repo_to_test' directory.
+      - name: 4. Upload Mutation Report as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: mutation-test-dashboard
-          path: mutation-dashboard.html
+          path: repo_to_test/mutation-dashboard.html
