@@ -28,3 +28,11 @@ RUN python3 -m venv $VENV_PATH
 # Add the virtual environment's bin directory to the PATH
 # This ensures that any command like 'python' or 'pip' will use the venv's version
 ENV PATH="$VENV_PATH/bin:$PATH"
+
+# --- NEW: INSTALL PYTHON REQUIREMENTS ---
+# Set the application working directory
+WORKDIR /app
+# Copy ONLY the requirements file into the image
+COPY ./requirements.txt .
+# Install the packages. This is now part of the base image.
+RUN python -m pip install --no-cache-dir -r requirements.txt
