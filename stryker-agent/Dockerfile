@@ -1,6 +1,6 @@
 # IMPORTANT: We will replace this line later with the actual path from GHCR.
 # Example: FROM ghcr.io/your-org/your-repo:base-latest
-FROM ghcr.io/YOUR_ORG/YOUR_REPO:base-latest
+FROM ghcr.io/shashidharanaik271/mutation360:base-latest
 
 # Set up the Python application directory
 WORKDIR /app
