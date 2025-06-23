@@ -26,11 +26,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # THIS IS THE NEW, CORRECT STEP
+      - name: Prepare Docker tag in lowercase
+        id: prep
+        run: |
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "repo_lc=$REPO_LC" >> "$GITHUB_OUTPUT"
+
+      # THIS STEP IS NOW FIXED TO USE THE OUTPUT FROM THE STEP ABOVE
       - name: Build and push base image
         uses: docker/build-push-action@v5
         with:
           context: ./stryker-agent
           file: ./stryker-agent/Dockerfile.base
           push: true
-          tags: ghcr.io/${{ github.repository }}:base-latest
-          lowercase: true
+          # This now uses the lowercase variable `repo_lc`
+          tags: ghcr.io/${{ steps.prep.outputs.repo_lc }}:base-latest
