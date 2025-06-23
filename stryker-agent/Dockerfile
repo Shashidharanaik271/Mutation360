@@ -1,15 +1,10 @@
-# IMPORTANT: We will replace this line later with the actual path from GHCR.
-# Example: FROM ghcr.io/your-org/your-repo:base-latest
+# Use your pre-built base image, which now includes all Python packages
 FROM ghcr.io/shashidharanaik271/mutation360:base-latest
 
-# Set up the Python application directory
-WORKDIR /app
-COPY ./requirements.txt .
+# The WORKDIR is already /app from the base image.
+# All Python packages are already installed.
 
-# Install the packages into the activated virtual environment
-RUN python -m pip install --no-cache-dir -r requirements.txt
-
-# Copy the application code into the container
+# Just copy the application code into the container
 COPY ./app /app
 
 # The entrypoint will now automatically use the Python from the virtual environment
