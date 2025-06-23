@@ -9,34 +9,31 @@ jobs:
   run-ai-agent:
     runs-on: ubuntu-latest
     permissions:
-      # These permissions are correct and necessary for the agent
       pull-requests: write
       contents: write
+      # --- FIX: Add permission to read from GitHub Packages ---
+      packages: read
 
     steps:
-      # --- FIX: STEP 1 ---
-      # Checkout the master branch which contains the trusted AI agent code.
       - name: 1. Checkout Agent Code (from master branch)
         uses: actions/checkout@v4
         with:
-          ref: 'master'         # Explicitly check out the master branch
-          path: 'agent_code'    # Place it in a separate directory
+          ref: 'master'
+          path: 'agent_code'
 
-      # --- FIX: STEP 2 ---
-      # Checkout the feature branch that triggered the workflow. This is the code we want to test.
       - name: 2. Checkout Feature Branch Code (to be tested)
         uses: actions/checkout@v4
         with:
-          path: 'repo_to_test'  # Place it in another directory
+          path: 'repo_to_test'
 
-      # --- FIX: STEP 3 ---
-      # Build the Docker image using the agent's code from the 'master' branch checkout.
-      # Then, run the container, mounting only the code-to-be-tested into the '/repo' directory.
+      # --- FIX: This step is now much faster ---
       - name: 3. Build and Run AI Agent
         run: |
-          # Build the image from the 'agent_code' directory
+          # This build command is now very fast. It pulls the pre-built base image
+          # from GHCR and just adds the Python application code on top.
           docker build --no-cache -t stryker-agent -f ./agent_code/stryker-agent/Dockerfile ./agent_code/stryker-agent
           
+          # The run command remains the same
           docker run --rm \
             -v "$(pwd)/repo_to_test":/repo \
             -e GITHUB_TOKEN="${{ secrets.GH_PAT }}" \
@@ -46,8 +43,6 @@ jobs:
             -e SOURCE_BRANCH="${{ github.head_ref }}" \
             stryker-agent
 
-      # --- FIX: STEP 4 ---
-      # The dashboard is created inside the '/repo' volume, which corresponds to the 'repo_to_test' directory.
       - name: 4. Upload Mutation Report as Artifact
         uses: actions/upload-artifact@v4
         with:
